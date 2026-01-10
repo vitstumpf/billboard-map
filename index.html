@@ -22,14 +22,14 @@
       background: #fff;
     }
 
-    /* Fit map to viewport; avoids second scrollbar in most embeds */
     #map{
       width: 100%;
-      height: calc(100vh - 140px);
+      height: calc(100vh - 160px);
       min-height: 420px;
       border-radius: 12px;
       overflow: hidden;
       background: #f3f3f3;
+      position: relative;
     }
 
     /* Loading overlay */
@@ -58,7 +58,7 @@
     #loading .txt{ font-size: 14px; color: #666; }
 
     /* Popup */
-    .bb-popup{ min-width: 240px; max-width: 380px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    .bb-popup{ min-width: 240px; max-width: 420px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     .bb-title{ font-weight: 800; font-size: 16px; margin-bottom: 6px; color: #222; }
     .bb-addr{ font-size: 13px; margin-bottom: 8px; color:#333; }
     .bb-details{ font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
@@ -67,7 +67,7 @@
     .bb-photo{ margin: 10px 0; }
     .bb-photo img{
       width: 100%;
-      max-width: 360px;
+      max-width: 380px;
       height: auto;
       display: block;
       background: #fafafa;
@@ -94,11 +94,11 @@
       display: inline-block;
       text-decoration: none;
       padding: 12px 16px;
-      border-radius: 0px;         /* square corners */
+      border-radius: 0px;
       font-weight: 800;
       font-size: 13px;
-      background: #0b6bcb;        /* blue */
-      color: #fff !important;     /* FORCE white text */
+      background: #0b6bcb;
+      color: #fff !important;
       border: none;
       cursor: pointer;
       text-align: center;
@@ -108,13 +108,126 @@
     }
     .bb-btn:hover{
       background: #084c8d;
-      color: #fff !important;
-    }
-    .bb-btn:visited{
       color:#fff !important;
     }
+    .bb-btn:visited{ color:#fff !important; }
 
+    /* Favorite row in popup */
+    .bb-fav-row{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin: 6px 0 2px;
+      user-select:none;
+    }
+    .bb-fav-btn{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      background: transparent;
+      border: 0;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+    }
+    .bb-fav-label{
+      font-weight: 700;
+      font-size: 13px;
+      color: #222;
+    }
+    .bb-star{
+      width: 22px;
+      height: 22px;
+      display:block;
+    }
+    .bb-star path{
+      stroke: #c4a400; /* gold */
+      stroke-width: 2;
+      fill: transparent;
+    }
+    .bb-fav-on .bb-star path{
+      fill: #ffd400; /* yellow filled */
+    }
+
+    /* Floating favorites bar */
+    #favbar{
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      z-index: 9998;
+      background: rgba(255,255,255,.97);
+      border: 1px solid #e2e2e2;
+      box-shadow: 0 6px 20px rgba(0,0,0,.12);
+      padding: 12px 12px;
+      min-width: 260px;
+      max-width: 360px;
+      display: none;
+    }
+    #favbar .top{
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    #favbar .count{
+      font-weight: 800;
+      font-size: 14px;
+      color:#222;
+    }
+    #favbar .actions{
+      display:flex;
+      gap:8px;
+    }
+    .bb-mini{
+      font-size: 12px;
+      padding: 8px 10px;
+      border-radius: 0;
+      border: 1px solid #ddd;
+      background: #fff;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .bb-mini:hover{ background:#f5f5f5; }
+    .bb-mini.primary{
+      background:#0b6bcb;
+      border-color:#0b6bcb;
+      color:#fff;
+    }
+    .bb-mini.primary:hover{ background:#084c8d; border-color:#084c8d; }
+
+    #favlist{
+      max-height: 180px;
+      overflow:auto;
+      border-top: 1px solid #eee;
+      padding-top: 8px;
+      margin-top: 8px;
+      display:none;
+    }
+    .favitem{
+      font-size: 12px;
+      margin: 6px 0;
+      line-height: 1.3;
+    }
+    .favitem b{ font-weight:800; }
     .muted{ color:#666; font-size: 12px; }
+
+    /* Toast */
+    #toast{
+      position: fixed;
+      left: 50%;
+      bottom: 16px;
+      transform: translateX(-50%);
+      z-index: 9999;
+      background: rgba(20,20,20,.92);
+      color: #fff;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font-size: 13px;
+      display: none;
+      max-width: 92vw;
+    }
+    #toast a{ color:#fff; text-decoration: underline; }
   </style>
 </head>
 
@@ -134,6 +247,23 @@
     </div>
   </div>
 
+  <div id="favbar">
+    <div class="top">
+      <div class="count" id="favcount">Favoriten: 0</div>
+      <div class="actions">
+        <button class="bb-mini" id="btnToggleList" type="button">Liste</button>
+        <button class="bb-mini" id="btnClearFav" type="button">Leeren</button>
+      </div>
+    </div>
+    <button class="bb-mini primary" id="btnRequest" type="button">Angebot anfordern</button>
+    <div id="favlist"></div>
+    <div class="muted" style="margin-top:6px;">
+      Tipp: Beim Klick auf „Angebot anfordern“ wird der Text kopiert – bitte in „Ihre Nachricht“ einfügen (Strg+V).
+    </div>
+  </div>
+
+  <div id="toast"></div>
+
   <script>
   (function () {
     // ========= CONFIG =========
@@ -149,15 +279,39 @@
     const CACHE_MINUTES = 15;   // 0 = disable cache
     const DEFAULT_CENTER = [51.0, 10.0];
     const DEFAULT_ZOOM = 6;
+
+    // Text inserted into "Ihre Nachricht"
+    const MESSAGE_PREFIX =
+`Guten Tag,
+bitte kontaktieren Sie mich bezüglich der folgenden Werbeflächen:`;
+
+    // If later you discover the real query parameter for the message field,
+    // put it here (e.g. "message" or "field_XXXX"). For now we keep clipboard.
+    const PREFILL_FIELD_PARAM = ""; // e.g. "message"
     // ==========================
 
     const statusEl  = document.getElementById("status");
     const loadingEl = document.getElementById("loading");
     const hintEl    = document.getElementById("hint");
+    const favBarEl  = document.getElementById("favbar");
+    const favCountEl= document.getElementById("favcount");
+    const favListEl = document.getElementById("favlist");
+    const toastEl   = document.getElementById("toast");
+
+    const btnToggleList = document.getElementById("btnToggleList");
+    const btnClearFav   = document.getElementById("btnClearFav");
+    const btnRequest    = document.getElementById("btnRequest");
 
     const setStatus = (m) => { statusEl.textContent = m; };
     const showLoading = () => { loadingEl.style.display = "flex"; };
     const hideLoading = () => { loadingEl.style.display = "none"; };
+
+    function toast(msg, ms=3500){
+      toastEl.innerHTML = msg;
+      toastEl.style.display = "block";
+      clearTimeout(toastEl.__t);
+      toastEl.__t = setTimeout(()=>toastEl.style.display="none", ms);
+    }
 
     function loadCSS(url){
       return new Promise((res, rej) => {
@@ -204,10 +358,133 @@
       try { localStorage.setItem("bb_photo_ext_v1", JSON.stringify(obj)); } catch {}
     }
 
+    // ===== Favorites storage =====
+    const FAV_KEY = "bb_favs_v1";
+    function getFavs(){
+      try {
+        const raw = localStorage.getItem(FAV_KEY);
+        const arr = raw ? JSON.parse(raw) : [];
+        return Array.isArray(arr) ? arr : [];
+      } catch { return []; }
+    }
+    function setFavs(arr){
+      try { localStorage.setItem(FAV_KEY, JSON.stringify(arr)); } catch {}
+      renderFavBar();
+    }
+    function isFav(id){
+      const favs = getFavs();
+      return favs.some(x => String(x.id) === String(id));
+    }
+    function toggleFav(row){
+      const id = String(row.id || "").trim();
+      if (!id) return;
+      let favs = getFavs();
+      const idx = favs.findIndex(x => String(x.id) === id);
+      if (idx >= 0) {
+        favs.splice(idx, 1);
+        setFavs(favs);
+        toast("Aus Favoriten entfernt.");
+      } else {
+        // store minimal useful fields
+        favs.push({
+          id,
+          title: row.title || "",
+          address: row.address || "",
+          price: row.price || "",
+          format: row.format || "",
+          leistungswert: row.leistungswert || ""
+        });
+        setFavs(favs);
+        toast("Zu Favoriten hinzugefügt.");
+      }
+    }
+
+    function buildMessageFromFavs(){
+      const favs = getFavs();
+      const lines = favs.map(f => {
+        const parts = [
+          `ID ${f.id}`,
+          f.title ? f.title : "",
+          f.address ? f.address : "",
+          f.format ? `Format: ${f.format}` : "",
+          f.price ? `Preis: ${f.price}` : "",
+          f.leistungswert ? `Leistungswert: ${f.leistungswert}` : ""
+        ].filter(Boolean);
+        return "- " + parts.join(" | ");
+      });
+      return `${MESSAGE_PREFIX}\n\n${lines.join("\n")}\n`;
+    }
+
+    async function copyToClipboard(text){
+      try {
+        await navigator.clipboard.writeText(text);
+        return true;
+      } catch {
+        // fallback
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        try { document.execCommand("copy"); } catch {}
+        document.body.removeChild(ta);
+        return true;
+      }
+    }
+
+    function openFormWithMessage(msg){
+      if (PREFILL_FIELD_PARAM && PREFILL_FIELD_PARAM.trim()) {
+        // If you later know correct param name, this will auto-fill
+        const u = new URL(FORM_URL);
+        u.searchParams.set(PREFILL_FIELD_PARAM.trim(), msg);
+        window.open(u.toString(), "_blank", "noopener");
+        return;
+      }
+      // Clipboard-first flow (always works)
+      window.open(FORM_URL, "_blank", "noopener");
+    }
+
+    function renderFavBar(){
+      const favs = getFavs();
+      const n = favs.length;
+      favCountEl.textContent = `Favoriten: ${n}`;
+      favBarEl.style.display = n > 0 ? "block" : "none";
+
+      if (favListEl.style.display !== "none") {
+        favListEl.innerHTML = favs.map(f => `
+          <div class="favitem">
+            <b>${esc(f.id)}</b> — ${esc(f.title || "")}<br>
+            <span class="muted">${esc(f.address || "")}</span>
+          </div>
+        `).join("");
+      }
+    }
+
+    btnToggleList.addEventListener("click", () => {
+      const open = favListEl.style.display !== "none";
+      favListEl.style.display = open ? "none" : "block";
+      btnToggleList.textContent = open ? "Liste" : "Schließen";
+      renderFavBar();
+    });
+
+    btnClearFav.addEventListener("click", () => {
+      setFavs([]);
+      toast("Favoriten wurden geleert.");
+    });
+
+    btnRequest.addEventListener("click", async () => {
+      const favs = getFavs();
+      if (!favs.length) return;
+      const msg = buildMessageFromFavs();
+      await copyToClipboard(msg);
+      toast('Text wurde kopiert. Bitte in „Ihre Nachricht“ einfügen (Strg+V).');
+      openFormWithMessage(msg);
+    });
+
     function normalizeRow(row) {
       row = row || {};
       row.id = String(row.id ?? "").trim();
-
       row.title   = row.title ?? "";
       row.address = row.address ?? "";
       row.lat     = row.lat ?? "";
@@ -215,22 +492,16 @@
       row.price   = row.price ?? "";
       row.format  = row.format ?? "";
       row.notes   = row.notes ?? "";
-
       row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
       return row;
     }
 
-    function buildFormLink(row) {
-      const context =
-        "ID: " + (row.id || "") + "\n" +
-        "Titel: " + (row.title || "") + "\n" +
-        "Adresse: " + (row.address || "") + "\n" +
-        "Preis: " + (row.price || "") + "\n" +
-        "Format: " + (row.format || "") + "\n" +
-        "Leistungswert: " + (row.leistungswert || "");
-
-      const params = new URLSearchParams({ context });
-      return FORM_URL + (FORM_URL.includes("?") ? "&" : "?") + params.toString();
+    function starSvg(){
+      return `
+        <svg class="bb-star" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 2.4l2.9 6.2 6.8.6-5.2 4.4 1.6 6.6-6.1-3.5-6.1 3.5 1.6-6.6-5.2-4.4 6.8-.6L12 2.4z"/>
+        </svg>
+      `;
     }
 
     function popupHtml(row) {
@@ -240,9 +511,10 @@
       const price  = esc(row.price || "");
       const lw     = esc(row.leistungswert || "");
       const notes  = esc(row.notes || "");
-      const btnUrl = buildFormLink(row);
 
       const photoSlotId = "photo_" + esc(row.id || ("x" + Math.random().toString(16).slice(2)));
+      const favBtnId = "fav_" + esc(row.id || ("x" + Math.random().toString(16).slice(2)));
+      const favClass = isFav(row.id) ? "bb-fav-btn bb-fav-on" : "bb-fav-btn";
 
       return `
         <div class="bb-popup">
@@ -256,45 +528,51 @@
             ${row.id ? `<div style="opacity:.7"><b>ID:</b> ${esc(row.id)}</div>` : ""}
           </div>
 
+          <div class="bb-fav-row">
+            <button type="button" id="${favBtnId}" class="${favClass}" aria-label="Merken">
+              ${starSvg()}
+              <span class="bb-fav-label">Merken</span>
+            </button>
+          </div>
+
           <div class="bb-photo" id="${photoSlotId}">
             <div class="bb-nophoto">Foto wird geladen…</div>
           </div>
 
           ${notes ? `<div class="bb-notes"><b>Hinweise:</b><br>${notes}</div>` : ""}
 
-          <a href="${esc(btnUrl)}" target="_blank" rel="noopener" class="bb-btn">Angebot anfordern</a>
+          <button type="button" class="bb-btn" data-request="1">Angebot für Favoriten anfordern</button>
         </div>
       `;
     }
 
+    // Cache
     function getCachedRows() {
       if (CACHE_MINUTES === 0) return null;
       try {
-        const raw = localStorage.getItem("bb_map_cache_v4");
+        const raw = localStorage.getItem("bb_map_cache_v5");
         if (!raw) return null;
         const obj = JSON.parse(raw);
         const ageMin = (Date.now() - obj.ts) / 1000 / 60;
         if (ageMin <= CACHE_MINUTES && Array.isArray(obj.rows)) return obj.rows;
-        localStorage.removeItem("bb_map_cache_v4");
+        localStorage.removeItem("bb_map_cache_v5");
       } catch {}
       return null;
     }
-
     function setCachedRows(rows) {
       if (CACHE_MINUTES === 0) return;
-      try { localStorage.setItem("bb_map_cache_v4", JSON.stringify({ ts: Date.now(), rows })); } catch {}
+      try { localStorage.setItem("bb_map_cache_v5", JSON.stringify({ ts: Date.now(), rows })); } catch {}
     }
 
     function saveMapPos(map) {
       try {
         const c = map.getCenter();
-        localStorage.setItem("bb_map_pos_v4", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
+        localStorage.setItem("bb_map_pos_v5", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
       } catch {}
     }
-
     function restoreMapPos(map) {
       try {
-        const raw = localStorage.getItem("bb_map_pos_v4");
+        const raw = localStorage.getItem("bb_map_pos_v5");
         if (!raw) return false;
         const p = JSON.parse(raw);
         map.setView([p.lat, p.lng], p.zoom);
@@ -372,20 +650,52 @@
       map.on("moveend", () => saveMapPos(map));
       restoreMapPos(map);
 
+      // On popup open: load photo + wire favorite button + request button
       map.on("popupopen", (e) => {
         try {
           const marker = e.popup && e.popup._source;
           const row = marker && marker.__row;
           if (!row || !row.id) return;
+
+          // photo
           const slot = document.getElementById("photo_" + row.id);
           if (slot) loadPhotoInto(slot, row.id);
+
+          // fav button
+          const favBtn = document.getElementById("fav_" + row.id);
+          if (favBtn) {
+            favBtn.onclick = () => {
+              toggleFav(row);
+              // update visual state
+              if (isFav(row.id)) favBtn.classList.add("bb-fav-on");
+              else favBtn.classList.remove("bb-fav-on");
+            };
+          }
+
+          // request button inside popup: add to favs (if not) and open request flow
+          const popupEl = e.popup.getElement();
+          if (popupEl) {
+            const reqBtn = popupEl.querySelector('[data-request="1"]');
+            if (reqBtn) {
+              reqBtn.onclick = async () => {
+                if (!isFav(row.id)) {
+                  toggleFav(row);
+                  if (favBtn) favBtn.classList.add("bb-fav-on");
+                }
+                const msg = buildMessageFromFavs();
+                await copyToClipboard(msg);
+                toast('Text wurde kopiert. Bitte in „Ihre Nachricht“ einfügen (Strg+V).');
+                openFormWithMessage(msg);
+              };
+            }
+          }
         } catch {}
       });
 
       const renderRows = (rows) => {
         clusters.clearLayers();
-
         let added = 0;
+
         for (const raw of rows) {
           const row = normalizeRow(raw);
           const lat = toNum(row.lat);
@@ -394,7 +704,7 @@
 
           const marker = L.marker([lat, lon]);
           marker.__row = row;
-          marker.bindPopup(popupHtml(row), { maxWidth: 420 });
+          marker.bindPopup(popupHtml(row), { maxWidth: 460 });
           clusters.addLayer(marker);
           added++;
         }
@@ -402,10 +712,12 @@
         hideLoading();
         setStatus("Werbeflächen: " + added);
         hintEl.style.display = added ? "none" : "block";
-
         if (added > 0) map.fitBounds(clusters.getBounds().pad(0.15));
+
+        renderFavBar();
       };
 
+      // Cache first
       const cached = getCachedRows();
       if (cached) { renderRows(cached); return; }
 
@@ -426,6 +738,8 @@
       });
     }
 
+    // Init
+    renderFavBar();
     init().catch(err => {
       hideLoading();
       setStatus("Fehler: " + err.message);
