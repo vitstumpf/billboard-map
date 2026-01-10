@@ -236,7 +236,7 @@
     const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
 
     // Pipedrive field key (query param name) where we prefill selected IDs
-    const PREFILL_FIELD_PARAM = "V2ViRm9ybUNhcHR1cmVCbG9jazoxNzBjMzU3NC0zZWRlLTExZWItYTEyNy1iMThlYzEzNTdiNTA";
+    const PREFILL_FIELD_PARAM = "V2ViRm9ybUNhcHR1cmVCbG9jazoxNzBjMzU3MC0zZWRlLTExZWItYTEyNy1iMThlYzEzNTdiNTA";
 
     // GitHub repo info (photos/<id>.<ext>)
     const GITHUB_USER = "vitstumpf";
@@ -352,9 +352,11 @@
 
     function buildIdsValue(){
       // what we pass to Pipedrive field: ONLY IDs, one per line
-      const ids = getSelectedIds();
-      return ids.join("\n");
-    }
+     const ids = getSelectedIds();
+  const header = "Guten Tag, bitte kontaktieren Sie mich bezüglich der folgenden Werbeflächen:";
+  const lines = ids.map(id => `[${id}]`);
+  return `${header}\n${lines.join("\n")}`;
+}
 
     async function copyToClipboard(text){
       try {
