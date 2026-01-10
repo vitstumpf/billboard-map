@@ -13,18 +13,90 @@
   />
 
   <style>
-    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-    #wrap { display: grid; grid-template-columns: 1fr 380px; height: 100vh; }
-    #map { height: 100vh; }
-    #panel { border-left: 1px solid #e6e6e6; padding: 14px; overflow: auto; }
+    /*
+      ЦЕЛИ:
+      1) Карта вровень с остальными блоками сайта (не на всю ширину окна)
+      2) Фото в popup грузятся стабильно (включая GitHub blob->raw)
+      3) В форму уходит ТОЛЬКО список ID (через запятую)
+      4) Загрузка данных из Google Sheets через опубликованный CSV (самый стабильный вариант)
+    */
+
+    :root {
+      --container-max: 1200px; /* подстрой под свой сайт */
+      --gap: 16px;
+      --panel-w: 380px;
+      --map-h: 520px;
+      --radius: 14px;
+      --border: #e8e8e8;
+      --muted: #666;
+      --bg: #fff;
+    }
+
+    /* НЕ делаем body full-width: это ломает вёрстку сайта */
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background: transparent; }
+
+    /* Контейнер вровень с сайтом */
+    .page-container {
+      max-width: var(--container-max);
+      margin: 0 auto;
+      padding: 0 16px;
+      box-sizing: border-box;
+    }
+
+    /* Общий блок карты + формы */
+    .map-and-form {
+      display: grid;
+      grid-template-columns: 1fr var(--panel-w);
+      gap: var(--gap);
+      align-items: start;
+      margin: 18px 0;
+    }
+
+    /* Карта должна иметь фиксированную высоту */
+    #map {
+      height: var(--map-h);
+      border-radius: var(--radius);
+      overflow: hidden;
+      border: 1px solid var(--border);
+      background: #f7f7f7;
+    }
+
+    /* Панель */
+    #panel {
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px;
+      background: var(--bg);
+    }
+
     .hint { font-size: 13px; color: #555; line-height: 1.35; }
-    .chip { display: inline-block; padding: 6px 10px; border: 1px solid #ddd; border-radius: 999px; margin: 6px 6px 0 0; font-size: 13px; }
-    .btn { cursor: pointer; border: 1px solid #ddd; background: #fff; padding: 10px 12px; border-radius: 10px; }
-    .btn:hover { background: #fafafa; }
-    .row { display: flex; gap: 8px; flex-wrap: wrap; }
     .sep { height: 1px; background: #eee; margin: 12px 0; }
 
-    /* popup images */
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .btn {
+      cursor: pointer;
+      border: 1px solid #ddd;
+      background: #fff;
+      padding: 10px 12px;
+      border-radius: 10px;
+      font: inherit;
+    }
+    .btn:hover { background: #fafafa; }
+
+    .chip {
+      display: inline-block;
+      padding: 6px 10px;
+      border: 1px solid #ddd;
+      border-radius: 999px;
+      margin: 6px 6px 0 0;
+      font-size: 13px;
+      user-select: none;
+      cursor: pointer;
+    }
+
+    /* Popup images */
+    .popup-title { font-weight: 650; }
+    .popup-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
     .popup-img {
       width: 100%;
       max-width: 260px;
@@ -34,70 +106,82 @@
       margin: 8px 0 0;
       border: 1px solid #eee;
     }
-    .popup-title { font-weight: 650; }
-    .popup-meta { font-size: 12px; color: #666; margin-top: 2px; }
+
+    /* Mobile */
+    @media (max-width: 980px) {
+      .map-and-form { grid-template-columns: 1fr; }
+      #map { height: 440px; }
+    }
+
+    /* Убираем таблицы/виджеты сайта поверх карты? (если нужно)
+       Можно закомментировать, если мешает.
+    */
   </style>
 </head>
 
 <body>
-  <div id="wrap">
-    <div id="map"></div>
+  <!-- ВСТАВЬ ЭТОТ БЛОК ТУДА, ГДЕ ДОЛЖНЫ БЫТЬ КАРТА И ФОРМА -->
+  <div class="page-container">
+    <div class="map-and-form">
+      <div id="map"></div>
 
-    <div id="panel">
-      <div style="font-weight:700; font-size:18px;">Заявка</div>
-      <div class="hint" style="margin-top:6px;">
-        Кликайте по маркерам на карте — выбранные <b>ID</b> добавятся в форму автоматически.
-        Повторный клик по выбранному ID — снимает выбор.
-      </div>
-
-      <div class="sep"></div>
-
-      <div style="font-weight:650;">Выбрано ID:</div>
-      <div id="selectedChips" style="margin-top:6px;"></div>
-
-      <div class="row" style="margin-top:10px;">
-        <button class="btn" id="clearBtn" type="button">Очистить выбор</button>
-        <button class="btn" id="copyBtn" type="button">Скопировать ID</button>
-      </div>
-
-      <div class="sep"></div>
-
-      <!-- ✅ Вариант 1: твоя собственная HTML-форма, которая постит прямо в Pipedrive -->
-      <!-- Подставь action и name hidden-поля из кода Pipedrive -->
-      <form id="leadForm" method="post" action="__PIPEDRIVE_FORM_ACTION__">
-        <!-- Только ID. Остальные поля можешь удалить/оставить — как тебе нужно -->
-        <input type="hidden" id="billboardIds" name="__PIPEDRIVE_ID_FIELD_NAME__" value="">
-
-        <div style="display:grid; gap:10px;">
-          <label>
-            Имя<br/>
-            <input name="name" required style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px;">
-          </label>
-
-          <label>
-            Телефон<br/>
-            <input name="phone" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px;">
-          </label>
-
-          <label>
-            Email<br/>
-            <input name="email" type="email" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px;">
-          </label>
-
-          <button class="btn" type="submit" style="padding:12px 14px; border-radius:12px;">
-            Отправить
-          </button>
-
-          <div class="hint">
-            Hidden поле (только ID): <code id="debugHidden"></code>
-          </div>
+      <aside id="panel">
+        <div style="font-weight:700; font-size:18px;">Заявка</div>
+        <div class="hint" style="margin-top:6px;">
+          Кликайте по маркерам — выбранные <b>ID</b> добавятся в форму автоматически.
+          Повторный клик по выбранному ID снимает выбор.
         </div>
-      </form>
 
-      <!-- ✅ Вариант 2 (если у тебя iframe-форма Pipedrive):
-           Тогда вместо form выше — вставь iframe, а hidden field обновлять нельзя напрямую.
-           В таком случае лучше использовать Вариант 1 (post в Pipedrive).
-      -->
+        <div class="sep"></div>
+
+        <div style="font-weight:650;">Выбрано ID:</div>
+        <div id="selectedChips" style="margin-top:6px;"></div>
+
+        <div class="row" style="margin-top:10px;">
+          <button class="btn" id="clearBtn" type="button">Очистить выбор</button>
+          <button class="btn" id="copyBtn" type="button">Скопировать ID</button>
+        </div>
+
+        <div class="sep"></div>
+
+        <!--
+          Pipedrive форма:
+          1) action = URL из embed-кода Pipedrive (<form action="..."></form>)
+          2) hidden input name = имя поля в Pipedrive (важно именно name, не id)
+
+          ВАЖНО:
+          Если ты используешь iframe-embed Pipedrive, в него нельзя "впрыснуть" значение.
+          Для автоподстановки ID нужен HTML form (как ниже), который отправляет напрямую в Pipedrive.
+        -->
+        <form id="leadForm" method="post" action="__PIPEDRIVE_FORM_ACTION__">
+          <input type="hidden" id="billboardIds" name="__PIPEDRIVE_ID_FIELD_NAME__" value="">
+
+          <div style="display:grid; gap:10px;">
+            <label>
+              Имя<br/>
+              <input name="name" required style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px; box-sizing:border-box;">
+            </label>
+
+            <label>
+              Телефон<br/>
+              <input name="phone" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px; box-sizing:border-box;">
+            </label>
+
+            <label>
+              Email<br/>
+              <input name="email" type="email" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px; box-sizing:border-box;">
+            </label>
+
+            <button class="btn" type="submit" style="padding:12px 14px; border-radius:12px;">
+              Отправить
+            </button>
+
+            <div class="hint">
+              Hidden поле (только ID): <code id="debugHidden"></code>
+            </div>
+          </div>
+        </form>
+      </aside>
     </div>
   </div>
 
@@ -109,28 +193,37 @@
 
   <script>
     /***********************
-     * 1) НАСТРОЙКИ
+     * НАСТРОЙКИ
      ***********************/
-    const SHEET_ID = "__GOOGLE_SHEET_ID__";
-    const SHEET_NAME = "__SHEET_TAB_NAME__"; // например "Sheet1"
-    // Ожидаемые заголовки колонок в таблице:
-    // ID | Lat | Lng | Photo
+
+    // ✅ 1) СТАБИЛЬНАЯ ЗАГРУЗКА ИЗ GOOGLE SHEETS:
+    // Вставь сюда ПРЯМУЮ ссылку на опубликованный CSV.
+    // Пример: https://docs.google.com/spreadsheets/d/e/XXXX/pub?gid=0&single=true&output=csv
+    const SHEET_CSV_URL = "__PASTE_PUBLISHED_CSV_URL_HERE__";
+
+    // ✅ 2) Названия колонок в таблице (как в первой строке CSV)
+    // Пример: ID, Lat, Lng, Photo
     const COL_ID = "ID";
     const COL_LAT = "Lat";
     const COL_LNG = "Lng";
-    const COL_PHOTO = "Photo"; // URL фото или несколько URL через запятую/пробел/перенос строки
+    const COL_PHOTO = "Photo"; // URL фото или несколько URL через запятую/перенос строки
 
-    // Pipedrive:
+    // ✅ 3) Pipedrive
     const PIPEDRIVE_FORM_ACTION = "__PIPEDRIVE_FORM_ACTION__";
     const PIPEDRIVE_ID_FIELD_NAME = "__PIPEDRIVE_ID_FIELD_NAME__";
 
-    // применим в DOM
-    document.querySelector("#leadForm").action = PIPEDRIVE_FORM_ACTION;
-    document.querySelector("#billboardIds").name = PIPEDRIVE_ID_FIELD_NAME;
+    // Применяем настройки к форме
+    (function initFormSettings() {
+      const form = document.getElementById('leadForm');
+      const hidden = document.getElementById('billboardIds');
+      if (form && PIPEDRIVE_FORM_ACTION && !PIPEDRIVE_FORM_ACTION.includes('__')) form.action = PIPEDRIVE_FORM_ACTION;
+      if (hidden && PIPEDRIVE_ID_FIELD_NAME && !PIPEDRIVE_ID_FIELD_NAME.includes('__')) hidden.name = PIPEDRIVE_ID_FIELD_NAME;
+    })();
 
     /***********************
-     * 2) ВСПОМОГАТЕЛЬНЫЕ
+     * ВСПОМОГАТЕЛЬНЫЕ
      ***********************/
+
     function esc(s) {
       return String(s ?? "")
         .replaceAll("&", "&amp;")
@@ -140,62 +233,132 @@
         .replaceAll("'", "&#039;");
     }
 
-    function parsePhotoUrls(cell) {
-      const raw = String(cell ?? "").trim();
-      if (!raw) return [];
-      // поддержим: запятые, пробелы, переносы строк, точки с запятой
-      const parts = raw
-        .split(/[\n,;]+/g)
-        .map(s => s.trim())
-        .filter(Boolean);
-
-      // если кто-то разделял пробелами — добьём:
-      const urls = [];
-      for (const p of parts) {
-        if (p.includes("http")) {
-          // иногда "url1 url2"
-          const maybe = p.split(/\s+/g).map(x => x.trim()).filter(Boolean);
-          urls.push(...maybe);
-        }
-      }
-      // уберём мусор и дубликаты
-      return [...new Set(urls)].filter(u => /^https?:\/\//i.test(u));
-    }
-
     function toNumber(x) {
       const n = Number(String(x).replace(",", "."));
       return Number.isFinite(n) ? n : null;
     }
 
+    // 1 ячейка может содержать несколько URL
+    function parsePhotoUrls(cell) {
+      const raw = String(cell ?? "").trim();
+      if (!raw) return [];
+
+      // поддержим: запятые, переносы строк, точки с запятой
+      const parts = raw
+        .split(/[\n,;]+/g)
+        .map(s => s.trim())
+        .filter(Boolean);
+
+      // иногда разделяют пробелами
+      const urls = [];
+      for (const p of parts) {
+        const maybe = p.split(/\s+/g).map(x => x.trim()).filter(Boolean);
+        urls.push(...maybe);
+      }
+
+      return [...new Set(urls)].filter(u => /^https?:\/\//i.test(u));
+    }
+
+    // GitHub blob -> raw (чтобы img грузился)
+    function normalizePhotoUrl(u) {
+      u = String(u || "").trim();
+      if (!u) return "";
+
+      // https://github.com/user/repo/blob/main/path.jpg
+      // -> https://raw.githubusercontent.com/user/repo/main/path.jpg
+      const m = u.match(/^https?:\/\/github\.com\/([^\/]+)\/([^\/]+)\/blob\/([^\/]+)\/(.+)$/i);
+      if (m) {
+        const [, user, repo, branch, path] = m;
+        return `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${path}`;
+      }
+
+      return u;
+    }
+
     /***********************
-     * 3) ЛОГИКА ВЫБОРА ID
+     * CSV ЗАГРУЗКА
      ***********************/
+
+    function parseCsvLine(line) {
+      const out = [];
+      let cur = "", inQ = false;
+
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQ && line[i + 1] === '"') { cur += '"'; i++; }
+          else inQ = !inQ;
+        } else if (ch === ',' && !inQ) {
+          out.push(cur);
+          cur = "";
+        } else {
+          cur += ch;
+        }
+      }
+      out.push(cur);
+      return out.map(s => s.trim());
+    }
+
+    function parseCsv(text) {
+      const lines = text.replace(/\r/g, "").split("\n").filter(l => l.trim().length);
+      if (lines.length < 2) return [];
+
+      const headers = parseCsvLine(lines[0]).map(h => h.trim());
+      return lines.slice(1).map(line => {
+        const cells = parseCsvLine(line);
+        const obj = {};
+        headers.forEach((h, i) => obj[h] = (cells[i] ?? "").trim());
+        return obj;
+      });
+    }
+
+    async function loadSheetRows() {
+      if (!SHEET_CSV_URL || SHEET_CSV_URL.includes('__')) {
+        throw new Error('Не задан SHEET_CSV_URL (ссылка на опубликованный CSV из Google Sheets).');
+      }
+
+      const res = await fetch(SHEET_CSV_URL, { redirect: 'follow' });
+      const text = await res.text();
+
+      // Если вернулась HTML-страница (бывает при не той ссылке)
+      if (text.trim().startsWith('<!DOCTYPE') || text.toLowerCase().includes('<html')) {
+        throw new Error('Google вернул HTML вместо CSV. Нужна ссылка с output=csv из Publish to web.');
+      }
+
+      return parseCsv(text);
+    }
+
+    /***********************
+     * ВЫБОР ID -> hidden поле
+     ***********************/
+
     const selectedIds = new Set();
 
     function syncSelectedUI() {
-      // hidden value: "12,18,44"
       const ids = [...selectedIds];
-      const value = ids.join(",");
-      const hidden = document.getElementById("billboardIds");
-      hidden.value = value;
-      document.getElementById("debugHidden").textContent = value;
+      const value = ids.join(',');
 
-      // chips
-      const chips = document.getElementById("selectedChips");
-      chips.innerHTML = "";
+      const hidden = document.getElementById('billboardIds');
+      if (hidden) hidden.value = value;
+
+      const dbg = document.getElementById('debugHidden');
+      if (dbg) dbg.textContent = value;
+
+      const chips = document.getElementById('selectedChips');
+      if (!chips) return;
+
+      chips.innerHTML = '';
       if (ids.length === 0) {
-        chips.innerHTML = `<div class="hint">Пока ничего не выбрано.</div>`;
+        chips.innerHTML = '<div class="hint">Пока ничего не выбрано.</div>';
         return;
       }
+
       for (const id of ids) {
-        const el = document.createElement("span");
-        el.className = "chip";
+        const el = document.createElement('span');
+        el.className = 'chip';
         el.textContent = id;
-        el.title = "Нажмите, чтобы убрать";
-        el.onclick = () => {
-          selectedIds.delete(id);
-          syncSelectedUI();
-        };
+        el.title = 'Нажмите, чтобы убрать';
+        el.onclick = () => { selectedIds.delete(id); syncSelectedUI(); };
         chips.appendChild(el);
       }
     }
@@ -207,22 +370,21 @@
       syncSelectedUI();
     }
 
-    document.getElementById("clearBtn").addEventListener("click", () => {
+    document.getElementById('clearBtn')?.addEventListener('click', () => {
       selectedIds.clear();
       syncSelectedUI();
     });
 
-    document.getElementById("copyBtn").addEventListener("click", async () => {
-      const value = [...selectedIds].join(",");
+    document.getElementById('copyBtn')?.addEventListener('click', async () => {
+      const value = [...selectedIds].join(',');
       try {
         await navigator.clipboard.writeText(value);
       } catch {
-        // fallback
-        const ta = document.createElement("textarea");
+        const ta = document.createElement('textarea');
         ta.value = value;
         document.body.appendChild(ta);
         ta.select();
-        document.execCommand("copy");
+        document.execCommand('copy');
         ta.remove();
       }
     });
@@ -230,57 +392,31 @@
     syncSelectedUI();
 
     /***********************
-     * 4) КАРТА
+     * КАРТА
      ***********************/
-    const map = L.map("map", { preferCanvas: true }).setView([50.584, 8.678], 11); // старт (пример: Гиссен)
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+
+    const map = L.map('map', { preferCanvas: true }).setView([50.584, 8.678], 11);
+
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 20,
       attribution: '&copy; OpenStreetMap'
     }).addTo(map);
 
     const markersLayer = L.layerGroup().addTo(map);
 
-    /***********************
-     * 5) ЗАГРУЗКА ДАННЫХ ИЗ GOOGLE SHEETS (GVIZ JSON)
-     ***********************/
-    async function loadSheetRows() {
-      // GViz endpoint (не требует API key, если лист опубликован)
-      const url =
-        `https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET_ID)}/gviz/tq?` +
-        `tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
-
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Не удалось загрузить таблицу: " + res.status);
-      const text = await res.text();
-
-      // Google возвращает "google.visualization.Query.setResponse(...);"
-      const jsonText = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
-      const data = JSON.parse(jsonText);
-
-      const cols = data.table.cols.map(c => c.label);
-      const rows = data.table.rows.map(r => r.c.map(cell => (cell ? cell.v : "")));
-
-      // в объект по заголовкам
-      return rows.map(values => {
-        const obj = {};
-        cols.forEach((k, i) => obj[k] = values[i]);
-        return obj;
-      });
-    }
-
     function buildPopupHtml(row) {
-      const id = row[COL_ID];
-      const photos = parsePhotoUrls(row[COL_PHOTO]);
+      const id = String(row[COL_ID] ?? '').trim();
+      const photos = parsePhotoUrls(row[COL_PHOTO]).map(normalizePhotoUrl);
 
       const title = `<div class="popup-title">Щит ID: ${esc(id)}</div>`;
-      const meta = `<div class="popup-meta">Клик по popup или маркеру: добавить/убрать ID</div>`;
+      const meta = `<div class="popup-meta">Клик по маркеру/окну: добавить/убрать ID</div>`;
 
-      let imgs = "";
+      let imgs = '';
       if (photos.length > 0) {
-        imgs = photos.slice(0, 6).map(u =>
-          `<img class="popup-img" src="${esc(u)}" loading="lazy" referrerpolicy="no-referrer"
-                onerror="this.style.display='none';" />`
-        ).join("");
+        imgs = photos.slice(0, 6).map(u => {
+          const safe = esc(u);
+          return `<img class="popup-img" src="${safe}" loading="lazy" referrerpolicy="no-referrer" onerror="this.style.display='none';" />`;
+        }).join('');
       } else {
         imgs = `<div class="popup-meta" style="margin-top:6px;">Фото не указано</div>`;
       }
@@ -292,33 +428,27 @@
       markersLayer.clearLayers();
 
       const rows = await loadSheetRows();
-
       const bounds = [];
 
       for (const row of rows) {
-        const id = String(row[COL_ID] ?? "").trim();
+        const id = String(row[COL_ID] ?? '').trim();
         const lat = toNumber(row[COL_LAT]);
         const lng = toNumber(row[COL_LNG]);
 
         if (!id || lat === null || lng === null) continue;
 
         const marker = L.marker([lat, lng], { title: `ID ${id}` });
+        marker.bindPopup(buildPopupHtml(row), { maxWidth: 320 });
 
-        const popupHtml = buildPopupHtml(row);
-        marker.bindPopup(popupHtml, { maxWidth: 300 });
+        // Клик по маркеру = переключить ID
+        marker.on('click', () => toggleId(id));
 
-        // ✅ ВЫБОР: по клику на маркер — переключаем ID и открываем popup
-        marker.on("click", () => {
-          toggleId(id);
-        });
-
-        // ✅ И по клику внутри popup — тоже переключаем (удобно на мобилке)
-        marker.on("popupopen", (e) => {
+        // Клик по открытому popup тоже переключает (удобно на мобилке)
+        marker.on('popupopen', (e) => {
           const el = e.popup.getElement();
           if (!el) return;
-          el.style.cursor = "pointer";
-          const handler = () => toggleId(id);
-          el.addEventListener("click", handler, { once: false });
+          el.style.cursor = 'pointer';
+          el.onclick = () => toggleId(id);
         });
 
         marker.addTo(markersLayer);
@@ -330,7 +460,7 @@
 
     renderMarkers().catch(err => {
       console.error(err);
-      alert("Ошибка загрузки карты/таблицы. Проверь: опубликован ли Google Sheet и правильные ли SHEET_ID/SHEET_NAME.");
+      alert(String(err?.message || err));
     });
   </script>
 </body>
