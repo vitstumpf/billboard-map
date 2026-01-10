@@ -98,7 +98,7 @@
       font-weight: 800;
       font-size: 13px;
       background: #0b6bcb;        /* blue */
-      color: #fff;                /* white text */
+      color: #fff !important;     /* FORCE white text */
       border: none;
       cursor: pointer;
       text-align: center;
@@ -106,7 +106,13 @@
       width: 100%;
       box-sizing: border-box;
     }
-    .bb-btn:hover{ background: #084c8d; }
+    .bb-btn:hover{
+      background: #084c8d;
+      color: #fff !important;
+    }
+    .bb-btn:visited{
+      color:#fff !important;
+    }
 
     .muted{ color:#666; font-size: 12px; }
   </style>
@@ -134,11 +140,11 @@
     const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
     const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
 
-    // Your GitHub repo (used to build photo URLs automatically)
+    // GitHub repo info (photos/<id>.<ext>)
     const GITHUB_USER = "vitstumpf";
     const GITHUB_REPO = "billboard-map";
     const GITHUB_BRANCH = "main";
-    const PHOTOS_DIR = "photos"; // folder in repo
+    const PHOTOS_DIR = "photos";
 
     const CACHE_MINUTES = 15;   // 0 = disable cache
     const DEFAULT_CENTER = [51.0, 10.0];
@@ -186,18 +192,11 @@
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
 
-    // Build raw GitHub URL for photos/<id>.<ext>
     function buildGitHubPhotoCandidates(id){
       const base = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${PHOTOS_DIR}/${encodeURIComponent(id)}`;
-      return [
-        base + ".jpg",
-        base + ".jpeg",
-        base + ".png",
-        base + ".webp"
-      ];
+      return [ base + ".jpg", base + ".jpeg", base + ".png", base + ".webp" ];
     }
 
-    // Cache: remember which extension worked for which id (faster next time)
     function getPhotoExtCache(){
       try { return JSON.parse(localStorage.getItem("bb_photo_ext_v1") || "{}"); } catch { return {}; }
     }
@@ -217,17 +216,11 @@
       row.format  = row.format ?? "";
       row.notes   = row.notes ?? "";
 
-      // Leistungswert may come as Leistungswert with capital L
       row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
-
-      // (We don't rely on photo_url anymore; GitHub photos by id is primary)
-      row.photo_url = row.photo_url || row["photo_url"] || "";
-
       return row;
     }
 
     function buildFormLink(row) {
-      // Reliable prefill: pass all info as single "context" param
       const context =
         "ID: " + (row.id || "") + "\n" +
         "Titel: " + (row.title || "") + "\n" +
@@ -249,7 +242,6 @@
       const notes  = esc(row.notes || "");
       const btnUrl = buildFormLink(row);
 
-      // We render a placeholder div for photo and fill it on popupopen
       const photoSlotId = "photo_" + esc(row.id || ("x" + Math.random().toString(16).slice(2)));
 
       return `
@@ -275,49 +267,41 @@
       `;
     }
 
-    // Cache
     function getCachedRows() {
       if (CACHE_MINUTES === 0) return null;
       try {
-        const raw = localStorage.getItem("bb_map_cache_v3");
+        const raw = localStorage.getItem("bb_map_cache_v4");
         if (!raw) return null;
         const obj = JSON.parse(raw);
         const ageMin = (Date.now() - obj.ts) / 1000 / 60;
         if (ageMin <= CACHE_MINUTES && Array.isArray(obj.rows)) return obj.rows;
-        localStorage.removeItem("bb_map_cache_v3");
+        localStorage.removeItem("bb_map_cache_v4");
       } catch {}
       return null;
     }
 
     function setCachedRows(rows) {
       if (CACHE_MINUTES === 0) return;
-      try {
-        localStorage.setItem("bb_map_cache_v3", JSON.stringify({ ts: Date.now(), rows }));
-      } catch {}
+      try { localStorage.setItem("bb_map_cache_v4", JSON.stringify({ ts: Date.now(), rows })); } catch {}
     }
 
-    // Map position persistence
     function saveMapPos(map) {
       try {
         const c = map.getCenter();
-        localStorage.setItem("bb_map_pos_v3", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
+        localStorage.setItem("bb_map_pos_v4", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
       } catch {}
     }
 
     function restoreMapPos(map) {
       try {
-        const raw = localStorage.getItem("bb_map_pos_v3");
+        const raw = localStorage.getItem("bb_map_pos_v4");
         if (!raw) return false;
         const p = JSON.parse(raw);
-        if (!p) return false;
         map.setView([p.lat, p.lng], p.zoom);
         return true;
-      } catch {
-        return false;
-      }
+      } catch { return false; }
     }
 
-    // Try candidates until one loads; if none, show "Kein Foto verfügbar"
     async function loadPhotoInto(slotEl, id){
       if (!slotEl || !id) {
         if (slotEl) slotEl.innerHTML = `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
@@ -329,34 +313,28 @@
 
       let candidates = buildGitHubPhotoCandidates(id);
       if (cachedExt) {
-        // move cached ext to front
         const preferred = candidates.find(u => u.endsWith(cachedExt));
         candidates = [preferred, ...candidates.filter(u => u !== preferred)].filter(Boolean);
       }
 
-      // Helper: load image with promise
       const tryLoad = (url) => new Promise((resolve) => {
         const img = new Image();
         img.onload = () => resolve({ ok:true, url });
         img.onerror = () => resolve({ ok:false, url });
-        img.src = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now(); // bust caches
+        img.src = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now();
       });
 
       for (const url of candidates) {
         const res = await tryLoad(url);
         if (res.ok) {
-          // success
           const ext = url.slice(url.lastIndexOf("."));
           extCache[id] = ext;
           setPhotoExtCache(extCache);
-
-          // Put <img> into slot (no alt text -> no duplicate label if fails)
           slotEl.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`;
           return;
         }
       }
 
-      // none worked
       slotEl.innerHTML = `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
     }
 
@@ -364,7 +342,6 @@
       setStatus("Karte wird geladen…");
       showLoading();
 
-      // Load libraries
       await loadCSS("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
       await loadCSS("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css");
       await loadCSS("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css");
@@ -377,7 +354,6 @@
       if (!window.Papa) throw new Error("PapaParse ist nicht verfügbar.");
       if (!L.markerClusterGroup) throw new Error("MarkerCluster ist nicht verfügbar.");
 
-      // Init map
       const map = L.map("map", { scrollWheelZoom: true, zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -396,13 +372,11 @@
       map.on("moveend", () => saveMapPos(map));
       restoreMapPos(map);
 
-      // On popup open, resolve photo slot + load photo
       map.on("popupopen", (e) => {
         try {
           const marker = e.popup && e.popup._source;
           const row = marker && marker.__row;
           if (!row || !row.id) return;
-          // slot id is deterministic in popupHtml: photo_<id>
           const slot = document.getElementById("photo_" + row.id);
           if (slot) loadPhotoInto(slot, row.id);
         } catch {}
@@ -419,30 +393,22 @@
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
           const marker = L.marker([lat, lon]);
-          marker.__row = row; // keep row for popupopen
+          marker.__row = row;
           marker.bindPopup(popupHtml(row), { maxWidth: 420 });
           clusters.addLayer(marker);
           added++;
         }
 
         hideLoading();
-
         setStatus("Werbeflächen: " + added);
         hintEl.style.display = added ? "none" : "block";
 
-        if (added > 0) {
-          map.fitBounds(clusters.getBounds().pad(0.15));
-        }
+        if (added > 0) map.fitBounds(clusters.getBounds().pad(0.15));
       };
 
-      // Cache first
       const cached = getCachedRows();
-      if (cached) {
-        renderRows(cached);
-        return;
-      }
+      if (cached) { renderRows(cached); return; }
 
-      // Load CSV
       Papa.parse(CSV_URL, {
         download: true,
         header: true,
