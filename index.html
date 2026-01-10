@@ -1,0 +1,255 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Billboard Map</title>
+
+  <style>
+    @keyframes bbspin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#fff;}
+    .wrap{max-width:1200px;margin:0 auto;padding:16px;}
+    #status{font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial;padding:10px 12px;border:1px dashed #bbb;border-radius:10px;margin:10px 0;background:#fff;}
+    #map{width:100%;height:75vh;min-height:600px;border-radius:12px;overflow:hidden;background:#f3f3f3;}
+    #loading{position:fixed;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;}
+    #loading .box{background:rgba(255,255,255,.96);padding:18px 22px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.15);text-align:center;}
+    #loading .spin{width:40px;height:40px;border:3px solid #f3f3f3;border-top:3px solid #0b6bcb;border-radius:50%;margin:0 auto 10px;animation:bbspin 1s linear infinite;}
+    #loading .txt{font-size:14px;color:#666;}
+
+    /* Popup */
+    .bb-popup{min-width:240px;max-width:340px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
+    .bb-title{font-weight:700;font-size:16px;margin-bottom:6px;color:#222;}
+    .bb-addr{font-size:13px;margin-bottom:8px;}
+    .bb-details{font-size:13px;line-height:1.5;margin-bottom:10px;}
+    .bb-details div{margin:4px 0;}
+    .bb-photo{margin:10px 0;}
+    .bb-photo img{width:100%;max-width:320px;height:auto;border-radius:10px;display:block;}
+    .bb-nophoto{margin:10px 0;font-size:12px;opacity:.75;font-style:italic;}
+    .bb-notes{font-size:12px;margin:8px 0;opacity:.9;padding:8px;background:#f5f5f5;border-radius:6px;}
+    .bb-btn{display:inline-block;text-decoration:none;padding:12px 16px;border-radius:10px;font-weight:700;font-size:13px;background:#0b6bcb;color:#fff;border:none;cursor:pointer;text-align:center;margin-top:10px;width:100%;box-sizing:border-box;}
+    .bb-btn:hover{background:#084c8d;}
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div id="status">⏳ Karte wird geladen…</div>
+    <div id="map"></div>
+  </div>
+
+  <div id="loading">
+    <div class="box">
+      <div class="spin"></div>
+      <div class="txt">Werbeflächen werden geladen…</div>
+    </div>
+  </div>
+
+  <script>
+  (function(){
+    const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
+    const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
+
+    const CACHE_MINUTES = 15;
+    const DEFAULT_CENTER = [51.0, 10.0];
+    const DEFAULT_ZOOM = 6;
+
+    const statusEl = document.getElementById("status");
+    const loadingEl = document.getElementById("loading");
+    const setStatus = (m)=> statusEl.textContent = m;
+    const showLoading = ()=> loadingEl.style.display="flex";
+    const hideLoading = ()=> loadingEl.style.display="none";
+
+    const log = (...a)=> console.log("[BBMap]",...a);
+
+    function loadCSS(url){
+      return new Promise((res,rej)=>{
+        const l=document.createElement("link");
+        l.rel="stylesheet"; l.href=url;
+        l.onload=res; l.onerror=()=>rej(new Error("CSS konnte nicht geladen werden: "+url));
+        document.head.appendChild(l);
+      });
+    }
+    function loadScript(url){
+      return new Promise((res,rej)=>{
+        const s=document.createElement("script");
+        s.src=url; s.async=true;
+        s.onload=res; s.onerror=()=>rej(new Error("Script konnte nicht geladen werden: "+url));
+        document.head.appendChild(s);
+      });
+    }
+    const toNum=(v)=> Number(String(v??"").trim().replace(",","."));
+    const esc=(s)=> String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
+
+    function normalizeRow(row){
+      row.id = String(row.id ?? "").trim();
+      row.title = row.title ?? "";
+      row.address = row.address ?? "";
+      row.lat = row.lat ?? "";
+      row.lon = row.lon ?? "";
+      row.price = row.price ?? "";
+      row.format = row.format ?? "";
+      row.notes = row.notes ?? "";
+      row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
+      row.photo_url = row.photo_url || row.Photo_URL || row.photo || row.photoUrl || "";
+
+      // Drive: uc?id= -> uc?export=view&id=
+      const p = String(row.photo_url || "").trim();
+      if (p.startsWith("https://drive.google.com/uc?id=")) {
+        const fileId = p.split("uc?id=")[1];
+        row.photo_url = "https://drive.google.com/uc?export=view&id=" + encodeURIComponent(fileId);
+      }
+      return row;
+    }
+
+    function buildFormLink(row){
+      const context =
+        "ID: " + (row.id||"") + "\n" +
+        "Titel: " + (row.title||"") + "\n" +
+        "Adresse: " + (row.address||"") + "\n" +
+        "Preis: " + (row.price||"") + "\n" +
+        "Format: " + (row.format||"") + "\n" +
+        "Leistungswert: " + (row.leistungswert||"");
+      const params = new URLSearchParams({ context });
+      return FORM_URL + (FORM_URL.includes("?") ? "&" : "?") + params.toString();
+    }
+
+    function popupHtml(row){
+      const title = esc(row.title || "");
+      const address = esc(row.address || "");
+      const format = esc(row.format || "");
+      const price = esc(row.price || "");
+      const lw = esc(row.leistungswert || "");
+      const notes = esc(row.notes || "");
+      const photo = (row.photo_url || "").trim();
+      const btnUrl = buildFormLink(row);
+
+      const photoBlock = photo
+        ? `<div class="bb-photo"><img src="${esc(photo)}" alt="${title}" loading="lazy"></div>`
+        : `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
+
+      return `
+        <div class="bb-popup">
+          <div class="bb-title">${title || ("ID " + esc(row.id || "?"))}</div>
+          ${address ? `<div class="bb-addr"><b>📍 Adresse:</b> ${address}</div>` : ""}
+          <div class="bb-details">
+            ${format ? `<div><b>Format:</b> ${format}</div>` : ""}
+            ${price ? `<div><b>Preis:</b> ${price}</div>` : ""}
+            ${lw ? `<div><b>Leistungswert:</b> ${lw}</div>` : ""}
+            ${row.id ? `<div style="opacity:.7"><b>ID:</b> ${esc(row.id)}</div>` : ""}
+          </div>
+          ${photoBlock}
+          ${notes ? `<div class="bb-notes"><b>ℹ️ Hinweise:</b><br>${notes}</div>` : ""}
+          <a href="${esc(btnUrl)}" target="_blank" rel="noopener" class="bb-btn">📧 Angebot anfordern</a>
+        </div>
+      `;
+    }
+
+    function getCachedRows(){
+      if (CACHE_MINUTES===0) return null;
+      try{
+        const raw=localStorage.getItem("bb_map_cache_v1");
+        if(!raw) return null;
+        const obj=JSON.parse(raw);
+        const ageMin=(Date.now()-obj.ts)/1000/60;
+        if(ageMin<=CACHE_MINUTES && Array.isArray(obj.rows)) return obj.rows;
+        localStorage.removeItem("bb_map_cache_v1");
+      }catch(e){ log("Cache read error",e); }
+      return null;
+    }
+    function setCachedRows(rows){
+      if (CACHE_MINUTES===0) return;
+      try{ localStorage.setItem("bb_map_cache_v1", JSON.stringify({ts:Date.now(), rows})); }
+      catch(e){ log("Cache write error",e); }
+    }
+    function saveMapPos(map){
+      try{
+        const c=map.getCenter();
+        localStorage.setItem("bb_map_pos_v1", JSON.stringify({lat:c.lat,lng:c.lng,zoom:map.getZoom()}));
+      }catch{}
+    }
+    function restoreMapPos(map){
+      try{
+        const raw=localStorage.getItem("bb_map_pos_v1");
+        if(!raw) return false;
+        const p=JSON.parse(raw);
+        if(!p) return false;
+        map.setView([p.lat,p.lng], p.zoom);
+        return true;
+      }catch{ return false; }
+    }
+
+    async function init(){
+      setStatus("⏳ Bibliotheken werden geladen…");
+      showLoading();
+
+      await loadCSS("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
+      await loadCSS("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css");
+      await loadCSS("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css");
+
+      await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
+      await loadScript("https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js");
+      await loadScript("https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js");
+
+      if(!window.L) throw new Error("Leaflet ist nicht verfügbar.");
+      if(!window.Papa) throw new Error("PapaParse ist nicht verfügbar.");
+      if(!L.markerClusterGroup) throw new Error("MarkerCluster ist nicht verfügbar.");
+
+      setStatus("⏳ Karte wird initialisiert…");
+
+      const map = L.map("map",{scrollWheelZoom:true,zoomControl:true}).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
+        maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+      }).addTo(map);
+
+      const clusters = L.markerClusterGroup({
+        maxClusterRadius:50,spiderfyOnMaxZoom:true,showCoverageOnHover:false,zoomToBoundsOnClick:true
+      });
+      map.addLayer(clusters);
+      map.on("moveend", ()=>saveMapPos(map));
+      restoreMapPos(map);
+
+      const renderRows = (rows)=>{
+        clusters.clearLayers();
+        let added=0;
+        for(const raw of rows){
+          const row=normalizeRow(raw);
+          const lat=toNum(row.lat), lon=toNum(row.lon);
+          if(!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+          const m=L.marker([lat,lon]);
+          m.bindPopup(popupHtml(row),{maxWidth:380});
+          clusters.addLayer(m);
+          added++;
+        }
+        hideLoading();
+        if(added>0){
+          map.fitBounds(clusters.getBounds().pad(0.15));
+          setStatus("✅ Fertig. Werbeflächen: "+added);
+        }else{
+          setStatus("⚠️ Keine gültigen Punkte. Bitte lat/lon prüfen.");
+        }
+      };
+
+      const cached=getCachedRows();
+      if(cached){
+        setStatus("⏳ Daten aus Cache werden geladen…");
+        renderRows(cached);
+        return;
+      }
+
+      setStatus("⏳ Daten werden aus Google Sheets geladen…");
+      Papa.parse(CSV_URL,{
+        download:true,header:true,skipEmptyLines:true,
+        complete:(r)=>{ const rows=r.data||[]; setCachedRows(rows); renderRows(rows); },
+        error:(e)=>{ hideLoading(); log(e); setStatus("❌ CSV konnte nicht geladen werden. Link/Publikation prüfen."); }
+      });
+    }
+
+    init().catch(err=>{
+      hideLoading();
+      setStatus("❌ Fehler: "+err.message);
+      log(err);
+    });
+  })();
+  </script>
+</body>
+</html>
