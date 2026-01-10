@@ -12,7 +12,8 @@
     @keyframes bbspin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
 
     .wrap { max-width: 1200px; margin: 0 auto; padding: 12px 16px; box-sizing: border-box; }
-    #status {
+
+    #status{
       font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial;
       padding: 10px 12px;
       border: 1px dashed #bbb;
@@ -21,10 +22,10 @@
       background: #fff;
     }
 
-    /* Make map fit viewport without extra scrollbar */
-    #map {
+    /* Fit map to viewport; avoids second scrollbar in most embeds */
+    #map{
       width: 100%;
-      height: calc(100vh - 140px); /* header + status + paddings */
+      height: calc(100vh - 140px);
       min-height: 420px;
       border-radius: 12px;
       overflow: hidden;
@@ -32,32 +33,72 @@
     }
 
     /* Loading overlay */
-    #loading { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; pointer-events: none; z-index: 9999; }
-    #loading .box { background: rgba(255,255,255,.96); padding: 18px 22px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,.15); text-align: center; }
-    #loading .spin { width: 40px; height: 40px; border: 3px solid #f3f3f3; border-top: 3px solid #e53935; border-radius: 50%; margin: 0 auto 10px; animation: bbspin 1s linear infinite; }
-    #loading .txt { font-size: 14px; color: #666; }
+    #loading{
+      position: fixed; inset: 0;
+      display: none;
+      align-items: center; justify-content: center;
+      pointer-events: none;
+      z-index: 9999;
+    }
+    #loading .box{
+      background: rgba(255,255,255,.96);
+      padding: 18px 22px;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.15);
+      text-align: center;
+    }
+    #loading .spin{
+      width: 40px; height: 40px;
+      border: 3px solid #f3f3f3;
+      border-top: 3px solid #0b6bcb;
+      border-radius: 50%;
+      margin: 0 auto 10px;
+      animation: bbspin 1s linear infinite;
+    }
+    #loading .txt{ font-size: 14px; color: #666; }
 
-    /* Popup styles */
-    .bb-popup { min-width: 240px; max-width: 360px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
-    .bb-title { font-weight: 800; font-size: 16px; margin-bottom: 6px; color: #222; }
-    .bb-addr { font-size: 13px; margin-bottom: 8px; color:#333; }
-    .bb-details { font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
-    .bb-details div { margin: 4px 0; }
-    .bb-photo { margin: 10px 0; }
-    .bb-photo img { width: 100%; max-width: 340px; height: auto; border-radius: 10px; display: block; background:#fafafa; }
-    .bb-nophoto { margin: 10px 0; font-size: 12px; opacity: .75; font-style: italic; }
-    .bb-notes { font-size: 12px; margin: 8px 0; opacity: .9; padding: 8px; background: #f5f5f5; border-radius: 6px; }
+    /* Popup */
+    .bb-popup{ min-width: 240px; max-width: 380px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    .bb-title{ font-weight: 800; font-size: 16px; margin-bottom: 6px; color: #222; }
+    .bb-addr{ font-size: 13px; margin-bottom: 8px; color:#333; }
+    .bb-details{ font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
+    .bb-details div{ margin: 4px 0; }
 
-    /* Button: red bg, white text */
-    .bb-btn {
+    .bb-photo{ margin: 10px 0; }
+    .bb-photo img{
+      width: 100%;
+      max-width: 360px;
+      height: auto;
+      display: block;
+      background: #fafafa;
+      border-radius: 10px;
+    }
+    .bb-nophoto{
+      margin: 10px 0;
+      font-size: 12px;
+      opacity: .75;
+      font-style: italic;
+    }
+
+    .bb-notes{
+      font-size: 12px;
+      margin: 8px 0;
+      opacity: .9;
+      padding: 8px;
+      background: #f5f5f5;
+      border-radius: 6px;
+    }
+
+    /* Button: blue bg, white text, square corners */
+    .bb-btn{
       display: inline-block;
       text-decoration: none;
       padding: 12px 16px;
-      border-radius: 10px;
+      border-radius: 0px;         /* square corners */
       font-weight: 800;
       font-size: 13px;
-      background: #e53935;
-      color: #fff;
+      background: #0b6bcb;        /* blue */
+      color: #fff;                /* white text */
       border: none;
       cursor: pointer;
       text-align: center;
@@ -65,11 +106,9 @@
       width: 100%;
       box-sizing: border-box;
     }
-    .bb-btn:hover { background: #c62828; }
+    .bb-btn:hover{ background: #084c8d; }
 
-    /* Small hint under status (optional) */
-    .muted { color:#666; font-size:12px; }
-
+    .muted{ color:#666; font-size: 12px; }
   </style>
 </head>
 
@@ -94,6 +133,12 @@
     // ========= CONFIG =========
     const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
     const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
+
+    // Your GitHub repo (used to build photo URLs automatically)
+    const GITHUB_USER = "vitstumpf";
+    const GITHUB_REPO = "billboard-map";
+    const GITHUB_BRANCH = "main";
+    const PHOTOS_DIR = "photos"; // folder in repo
 
     const CACHE_MINUTES = 15;   // 0 = disable cache
     const DEFAULT_CENTER = [51.0, 10.0];
@@ -141,24 +186,23 @@
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
 
-    function driveToDirectImage(url) {
-      const u = String(url || "").trim();
-      if (!u) return "";
+    // Build raw GitHub URL for photos/<id>.<ext>
+    function buildGitHubPhotoCandidates(id){
+      const base = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${PHOTOS_DIR}/${encodeURIComponent(id)}`;
+      return [
+        base + ".jpg",
+        base + ".jpeg",
+        base + ".png",
+        base + ".webp"
+      ];
+    }
 
-      // 1) https://drive.google.com/uc?id=FILE -> https://drive.google.com/uc?export=view&id=FILE
-      if (u.startsWith("https://drive.google.com/uc?id=")) {
-        const fileId = u.split("uc?id=")[1];
-        return "https://drive.google.com/uc?export=view&id=" + encodeURIComponent(fileId);
-      }
-
-      // 2) https://drive.google.com/file/d/FILE/view -> https://drive.google.com/uc?export=view&id=FILE
-      const m = u.match(/drive\.google\.com\/file\/d\/([^/]+)\//);
-      if (m && m[1]) {
-        return "https://drive.google.com/uc?export=view&id=" + encodeURIComponent(m[1]);
-      }
-
-      // already direct or non-drive url
-      return u;
+    // Cache: remember which extension worked for which id (faster next time)
+    function getPhotoExtCache(){
+      try { return JSON.parse(localStorage.getItem("bb_photo_ext_v1") || "{}"); } catch { return {}; }
+    }
+    function setPhotoExtCache(obj){
+      try { localStorage.setItem("bb_photo_ext_v1", JSON.stringify(obj)); } catch {}
     }
 
     function normalizeRow(row) {
@@ -176,11 +220,8 @@
       // Leistungswert may come as Leistungswert with capital L
       row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
 
-      // Photo URL key from CSV: photo_url
-      row.photo_url = row.photo_url || row["photo_url"] || row.Photo_URL || row.photo || row.photoUrl || "";
-
-      // Make Drive URLs work in <img>
-      row.photo_url = driveToDirectImage(row.photo_url);
+      // (We don't rely on photo_url anymore; GitHub photos by id is primary)
+      row.photo_url = row.photo_url || row["photo_url"] || "";
 
       return row;
     }
@@ -206,14 +247,10 @@
       const price  = esc(row.price || "");
       const lw     = esc(row.leistungswert || "");
       const notes  = esc(row.notes || "");
-      const photo  = String(row.photo_url ?? row["photo_url"] ?? "").trim();
       const btnUrl = buildFormLink(row);
 
-      const photoBlock = photo
-        ? `<div class="bb-photo">
-             <img src="${esc(photo)}" alt="${title}" loading="lazy" />
-           </div>`
-        : `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
+      // We render a placeholder div for photo and fill it on popupopen
+      const photoSlotId = "photo_" + esc(row.id || ("x" + Math.random().toString(16).slice(2)));
 
       return `
         <div class="bb-popup">
@@ -227,7 +264,9 @@
             ${row.id ? `<div style="opacity:.7"><b>ID:</b> ${esc(row.id)}</div>` : ""}
           </div>
 
-          ${photoBlock}
+          <div class="bb-photo" id="${photoSlotId}">
+            <div class="bb-nophoto">Foto wird geladen…</div>
+          </div>
 
           ${notes ? `<div class="bb-notes"><b>Hinweise:</b><br>${notes}</div>` : ""}
 
@@ -240,12 +279,12 @@
     function getCachedRows() {
       if (CACHE_MINUTES === 0) return null;
       try {
-        const raw = localStorage.getItem("bb_map_cache_v2");
+        const raw = localStorage.getItem("bb_map_cache_v3");
         if (!raw) return null;
         const obj = JSON.parse(raw);
         const ageMin = (Date.now() - obj.ts) / 1000 / 60;
         if (ageMin <= CACHE_MINUTES && Array.isArray(obj.rows)) return obj.rows;
-        localStorage.removeItem("bb_map_cache_v2");
+        localStorage.removeItem("bb_map_cache_v3");
       } catch {}
       return null;
     }
@@ -253,7 +292,7 @@
     function setCachedRows(rows) {
       if (CACHE_MINUTES === 0) return;
       try {
-        localStorage.setItem("bb_map_cache_v2", JSON.stringify({ ts: Date.now(), rows }));
+        localStorage.setItem("bb_map_cache_v3", JSON.stringify({ ts: Date.now(), rows }));
       } catch {}
     }
 
@@ -261,13 +300,13 @@
     function saveMapPos(map) {
       try {
         const c = map.getCenter();
-        localStorage.setItem("bb_map_pos_v2", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
+        localStorage.setItem("bb_map_pos_v3", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
       } catch {}
     }
 
     function restoreMapPos(map) {
       try {
-        const raw = localStorage.getItem("bb_map_pos_v2");
+        const raw = localStorage.getItem("bb_map_pos_v3");
         if (!raw) return false;
         const p = JSON.parse(raw);
         if (!p) return false;
@@ -276,6 +315,49 @@
       } catch {
         return false;
       }
+    }
+
+    // Try candidates until one loads; if none, show "Kein Foto verfügbar"
+    async function loadPhotoInto(slotEl, id){
+      if (!slotEl || !id) {
+        if (slotEl) slotEl.innerHTML = `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
+        return;
+      }
+
+      const extCache = getPhotoExtCache();
+      const cachedExt = extCache[id];
+
+      let candidates = buildGitHubPhotoCandidates(id);
+      if (cachedExt) {
+        // move cached ext to front
+        const preferred = candidates.find(u => u.endsWith(cachedExt));
+        candidates = [preferred, ...candidates.filter(u => u !== preferred)].filter(Boolean);
+      }
+
+      // Helper: load image with promise
+      const tryLoad = (url) => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ ok:true, url });
+        img.onerror = () => resolve({ ok:false, url });
+        img.src = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now(); // bust caches
+      });
+
+      for (const url of candidates) {
+        const res = await tryLoad(url);
+        if (res.ok) {
+          // success
+          const ext = url.slice(url.lastIndexOf("."));
+          extCache[id] = ext;
+          setPhotoExtCache(extCache);
+
+          // Put <img> into slot (no alt text -> no duplicate label if fails)
+          slotEl.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`;
+          return;
+        }
+      }
+
+      // none worked
+      slotEl.innerHTML = `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
     }
 
     async function init() {
@@ -314,6 +396,18 @@
       map.on("moveend", () => saveMapPos(map));
       restoreMapPos(map);
 
+      // On popup open, resolve photo slot + load photo
+      map.on("popupopen", (e) => {
+        try {
+          const marker = e.popup && e.popup._source;
+          const row = marker && marker.__row;
+          if (!row || !row.id) return;
+          // slot id is deterministic in popupHtml: photo_<id>
+          const slot = document.getElementById("photo_" + row.id);
+          if (slot) loadPhotoInto(slot, row.id);
+        } catch {}
+      });
+
       const renderRows = (rows) => {
         clusters.clearLayers();
 
@@ -325,6 +419,7 @@
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
           const marker = L.marker([lat, lon]);
+          marker.__row = row; // keep row for popupopen
           marker.bindPopup(popupHtml(row), { maxWidth: 420 });
           clusters.addLayer(marker);
           added++;
@@ -332,7 +427,6 @@
 
         hideLoading();
 
-        // Status: only count
         setStatus("Werbeflächen: " + added);
         hintEl.style.display = added ? "none" : "block";
 
