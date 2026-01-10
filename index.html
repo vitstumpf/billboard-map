@@ -1,558 +1,337 @@
-<!DOCTYPE html>
-<html lang="de">
+<!doctype html>
+<html lang="ru">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Карта рекламных щитов</title>
 
-  <!-- Leaflet -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
-  <!-- MarkerCluster -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
 
   <style>
-    :root{
-      --btn-blue:#0b6bcb;
-      --btn-blue-hover:#084c8d;
-      --text:#222;
-      --muted:#6b7280;
-      --bg:#fff;
-      --card:#ffffff;
-      --line:#e5e7eb;
-      --shadow:0 10px 30px rgba(0,0,0,.12);
-      --radius:12px;
-      --star:#f5b301;
-    }
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    #wrap { display: grid; grid-template-columns: 1fr 380px; height: 100vh; }
+    #map { height: 100vh; }
+    #panel { border-left: 1px solid #e6e6e6; padding: 14px; overflow: auto; }
+    .hint { font-size: 13px; color: #555; line-height: 1.35; }
+    .chip { display: inline-block; padding: 6px 10px; border: 1px solid #ddd; border-radius: 999px; margin: 6px 6px 0 0; font-size: 13px; }
+    .btn { cursor: pointer; border: 1px solid #ddd; background: #fff; padding: 10px 12px; border-radius: 10px; }
+    .btn:hover { background: #fafafa; }
+    .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .sep { height: 1px; background: #eee; margin: 12px 0; }
 
-    body{ margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; color:var(--text); }
-    #map-wrap{ width:100%; }
-
-    /* Top bar */
-    .topbar{
-      display:flex;
-      gap:12px;
-      align-items:center;
-      justify-content:space-between;
-      background:var(--card);
-      border:1px solid var(--line);
-      border-radius:12px;
-      padding:10px 12px;
-      margin:0 0 10px 0;
+    /* popup images */
+    .popup-img {
+      width: 100%;
+      max-width: 260px;
+      height: auto;
+      display: block;
+      border-radius: 10px;
+      margin: 8px 0 0;
+      border: 1px solid #eee;
     }
-    .count{
-      font-weight:600;
-      color:#111;
-    }
-    .count span{ color:var(--muted); font-weight:600; }
-    .actions{
-      display:flex;
-      gap:10px;
-      align-items:center;
-      flex-wrap:wrap;
-    }
-
-    .btn{
-      appearance:none;
-      border:0;
-      cursor:pointer;
-      padding:10px 14px;
-      font-weight:700;
-      font-size:13px;
-      background:var(--btn-blue);
-      color:#fff;                 /* ✅ белый текст */
-      border-radius:0px;          /* ✅ прямые углы */
-      transition:background .2s ease;
-      white-space:nowrap;
-    }
-    .btn:hover{ background:var(--btn-blue-hover); }
-    .btn:disabled{ opacity:.5; cursor:not-allowed; }
-
-    .btn-secondary{
-      background:#111827;
-      color:#fff;
-    }
-    .btn-secondary:hover{ background:#0b1220; }
-
-    /* Map */
-    #map{
-      width:100%;
-      height:70vh;
-      min-height:520px;
-      border-radius:12px;
-      overflow:hidden;
-      border:1px solid var(--line);
-    }
-
-    /* Loading overlay */
-    .map-loading{
-      position:absolute;
-      inset:0;
-      display:flex;
-      align-items:center;
-      justify-content:center;
-      background:rgba(255,255,255,.92);
-      z-index:1000;
-      border-radius:12px;
-      opacity:0;
-      pointer-events:none;
-      transition:opacity .15s ease;
-    }
-    .map-loading.active{ opacity:1; pointer-events:auto; }
-    .spinner{
-      border:3px solid #f3f3f3;
-      border-top:3px solid var(--btn-blue);
-      border-radius:50%;
-      width:34px; height:34px;
-      animation:spin 1s linear infinite;
-      margin-right:10px;
-    }
-    @keyframes spin{ 0%{transform:rotate(0)} 100%{transform:rotate(360deg)} }
-
-    /* Popup */
-    .billboard-popup{
-      min-width:260px;
-      max-width:360px;
-      font-family:inherit;
-    }
-    .popup-head{
-      display:flex;
-      justify-content:space-between;
-      gap:10px;
-      align-items:flex-start;
-      margin-bottom:8px;
-    }
-    .popup-title{
-      font-weight:800;
-      font-size:16px;
-      line-height:1.2;
-      margin:0;
-    }
-    .popup-sub{
-      font-size:13px;
-      color:#111;
-      margin-top:6px;
-    }
-    .popup-sub b{ color:#111; }
-    .popup-details{
-      font-size:13px;
-      line-height:1.55;
-      margin-top:8px;
-    }
-    .popup-details div{ margin:4px 0; }
-
-    .photo{
-      margin:10px 0 8px 0;
-      border-radius:12px;
-      overflow:hidden;
-      border:1px solid var(--line);
-      background:#fafafa;
-    }
-    .photo img{
-      width:100%;
-      height:auto;
-      display:block;
-    }
-    .no-photo{
-      font-size:12px;
-      color:var(--muted);
-      padding:10px;
-    }
-
-    .notes{
-      background:#f3f4f6;
-      border-radius:10px;
-      padding:10px;
-      font-size:12px;
-      margin-top:8px;
-    }
-
-    /* Star / Merken */
-    .save{
-      display:flex;
-      align-items:center;
-      gap:8px;
-      user-select:none;
-      cursor:pointer;
-      padding:6px 10px;
-      border:1px solid var(--line);
-      border-radius:999px;
-      background:#fff;
-    }
-    .star{
-      width:18px;
-      height:18px;
-      display:inline-block;
-      position:relative;
-    }
-    .star svg{ width:18px; height:18px; display:block; }
-    .save-label{ font-size:13px; font-weight:700; color:#111; }
-
-    .save[data-active="true"] .star path{
-      fill: var(--star);
-      stroke: var(--star);
-    }
-    .save[data-active="false"] .star path{
-      fill: transparent;
-      stroke: var(--star);
-    }
-
-    /* Make sure popup doesn't create inner scrollbar */
-    .leaflet-popup-content{
-      margin:14px 14px 12px 14px;
-      width:auto !important;
-    }
-
-    /* Wrapper to avoid extra scrollbars in some CMS blocks */
-    #map-container{
-      position:relative;
-      width:100%;
-      overflow:hidden;
-    }
+    .popup-title { font-weight: 650; }
+    .popup-meta { font-size: 12px; color: #666; margin-top: 2px; }
   </style>
 </head>
 
 <body>
-  <div id="map-wrap">
-    <div class="topbar">
-      <div class="count">Werbeflächen: <span id="count">0</span></div>
-      <div class="actions">
-        <button class="btn-secondary btn" id="clearSaved" type="button" title="Merkliste leeren">Merkliste leeren</button>
-        <button class="btn" id="requestOffer" type="button" disabled>Angebot anfordern</button>
-      </div>
-    </div>
+  <div id="wrap">
+    <div id="map"></div>
 
-    <div id="map-container">
-      <div id="map"></div>
-      <div class="map-loading active" id="map-loading">
-        <div class="spinner"></div>
-        <div style="font-weight:700; color:#111;">Karte wird geladen…</div>
+    <div id="panel">
+      <div style="font-weight:700; font-size:18px;">Заявка</div>
+      <div class="hint" style="margin-top:6px;">
+        Кликайте по маркерам на карте — выбранные <b>ID</b> добавятся в форму автоматически.
+        Повторный клик по выбранному ID — снимает выбор.
       </div>
+
+      <div class="sep"></div>
+
+      <div style="font-weight:650;">Выбрано ID:</div>
+      <div id="selectedChips" style="margin-top:6px;"></div>
+
+      <div class="row" style="margin-top:10px;">
+        <button class="btn" id="clearBtn" type="button">Очистить выбор</button>
+        <button class="btn" id="copyBtn" type="button">Скопировать ID</button>
+      </div>
+
+      <div class="sep"></div>
+
+      <!-- ✅ Вариант 1: твоя собственная HTML-форма, которая постит прямо в Pipedrive -->
+      <!-- Подставь action и name hidden-поля из кода Pipedrive -->
+      <form id="leadForm" method="post" action="__PIPEDRIVE_FORM_ACTION__">
+        <!-- Только ID. Остальные поля можешь удалить/оставить — как тебе нужно -->
+        <input type="hidden" id="billboardIds" name="__PIPEDRIVE_ID_FIELD_NAME__" value="">
+
+        <div style="display:grid; gap:10px;">
+          <label>
+            Имя<br/>
+            <input name="name" required style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px;">
+          </label>
+
+          <label>
+            Телефон<br/>
+            <input name="phone" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px;">
+          </label>
+
+          <label>
+            Email<br/>
+            <input name="email" type="email" style="width:100%; padding:10px; border:1px solid #ddd; border-radius:10px;">
+          </label>
+
+          <button class="btn" type="submit" style="padding:12px 14px; border-radius:12px;">
+            Отправить
+          </button>
+
+          <div class="hint">
+            Hidden поле (только ID): <code id="debugHidden"></code>
+          </div>
+        </div>
+      </form>
+
+      <!-- ✅ Вариант 2 (если у тебя iframe-форма Pipedrive):
+           Тогда вместо form выше — вставь iframe, а hidden field обновлять нельзя напрямую.
+           В таком случае лучше использовать Вариант 1 (post в Pipedrive).
+      -->
     </div>
   </div>
 
-  <!-- JS libs -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
-  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
 
   <script>
-  (function(){
-    // ================= CONFIG =================
-    const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
+    /***********************
+     * 1) НАСТРОЙКИ
+     ***********************/
+    const SHEET_ID = "__GOOGLE_SHEET_ID__";
+    const SHEET_NAME = "__SHEET_TAB_NAME__"; // например "Sheet1"
+    // Ожидаемые заголовки колонок в таблице:
+    // ID | Lat | Lng | Photo
+    const COL_ID = "ID";
+    const COL_LAT = "Lat";
+    const COL_LNG = "Lng";
+    const COL_PHOTO = "Photo"; // URL фото или несколько URL через запятую/пробел/перенос строки
 
-    const PIPEDRIVE_FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
+    // Pipedrive:
+    const PIPEDRIVE_FORM_ACTION = "__PIPEDRIVE_FORM_ACTION__";
+    const PIPEDRIVE_ID_FIELD_NAME = "__PIPEDRIVE_ID_FIELD_NAME__";
 
-    // ✅ найденный тобой ключ поля "Ihre Nachricht"
-    const PD_MESSAGE_KEY = "V2ViRm9ybUNhcHR1cmVCbG9jazoxNzBjMzU3NC0zZWRlLTExZWItYTEyNy1iMThlYzEzNTdiNTA";
+    // применим в DOM
+    document.querySelector("#leadForm").action = PIPEDRIVE_FORM_ACTION;
+    document.querySelector("#billboardIds").name = PIPEDRIVE_ID_FIELD_NAME;
 
-    // Text template
-    const MESSAGE_PREFIX =
-`Guten Tag,
-bitte kontaktieren Sie mich bezüglich der folgenden Werbeflächen:`;
-
-    // caching
-    const CACHE_MINUTES = 15;
-
-    // map default
-    const MAP_CENTER = [51.0, 10.0];
-    const MAP_ZOOM = 6;
-
-    // localStorage keys
-    const LS_DATA = "billboard_map_data_v2";
-    const LS_POS  = "billboard_map_position_v2";
-    const LS_SAVED = "billboard_saved_ids_v2";
-    // =========================================
-
-    const loadingEl = document.getElementById("map-loading");
-    const countEl = document.getElementById("count");
-    const requestBtn = document.getElementById("requestOffer");
-    const clearBtn = document.getElementById("clearSaved");
-
-    const toNum = (v) => {
-      if (v === null || v === undefined) return NaN;
-      const s = String(v).trim().replace(",", ".");
-      return Number(s);
-    };
-
-    const esc = (s) => String(s ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-
-    const showLoading = () => loadingEl && loadingEl.classList.add("active");
-    const hideLoading = () => loadingEl && loadingEl.classList.remove("active");
-
-    // -------- Saved IDs (Merkliste) --------
-    function getSavedSet(){
-      try{
-        const raw = localStorage.getItem(LS_SAVED);
-        if(!raw) return new Set();
-        const arr = JSON.parse(raw);
-        if(!Array.isArray(arr)) return new Set();
-        return new Set(arr.map(String));
-      }catch(e){
-        return new Set();
-      }
-    }
-    function saveSet(set){
-      localStorage.setItem(LS_SAVED, JSON.stringify(Array.from(set)));
-      updateTopButtons();
-    }
-    let saved = getSavedSet();
-
-    function updateTopButtons(){
-      const n = saved.size;
-      requestBtn.disabled = n === 0;
-      requestBtn.textContent = n === 0 ? "Angebot anfordern" : `Angebot anfordern (${n})`;
+    /***********************
+     * 2) ВСПОМОГАТЕЛЬНЫЕ
+     ***********************/
+    function esc(s) {
+      return String(s ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
     }
 
-    clearBtn.addEventListener("click", () => {
-      saved = new Set();
-      saveSet(saved);
-      // force popup redraw by closing all open popups
-      map.closePopup();
-      alert("Merkliste wurde geleert.");
-    });
+    function parsePhotoUrls(cell) {
+      const raw = String(cell ?? "").trim();
+      if (!raw) return [];
+      // поддержим: запятые, пробелы, переносы строк, точки с запятой
+      const parts = raw
+        .split(/[\n,;]+/g)
+        .map(s => s.trim())
+        .filter(Boolean);
 
-    // -------- Build message for form --------
-    function buildMessage(){
-      const ids = Array.from(saved);
-      const lines = ids.map(id => `- ID ${id}`);
-      return [MESSAGE_PREFIX, ...lines].join("\n");
-    }
-
-    function buildPipedriveUrlWithMessage(message){
-      // try simple ?KEY=...
-      const q1 = `${encodeURIComponent(PD_MESSAGE_KEY)}=${encodeURIComponent(message)}`;
-      // fallback format some forms expect: values[KEY]=...
-      const q2 = `values%5B${encodeURIComponent(PD_MESSAGE_KEY)}%5D=${encodeURIComponent(message)}`;
-
-      // We'll open with q1. If user reports not filled, switch to q2 easily.
-      return `${PIPEDRIVE_FORM_URL}?${q1}`;
-      // return `${PIPEDRIVE_FORM_URL}?${q2}`;
-    }
-
-    requestBtn.addEventListener("click", () => {
-      const msg = buildMessage();
-      const url = buildPipedriveUrlWithMessage(msg);
-      window.open(url, "_blank", "noopener");
-    });
-
-    // -------- Map init --------
-    const map = L.map("map", { scrollWheelZoom:true, zoomControl:true })
-      .setView(MAP_CENTER, MAP_ZOOM);
-
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-    }).addTo(map);
-
-    const markers = L.markerClusterGroup({
-      maxClusterRadius: 50,
-      spiderfyOnMaxZoom: true,
-      showCoverageOnHover: false,
-      zoomToBoundsOnClick: true
-    });
-    map.addLayer(markers);
-
-    function saveMapPosition(){
-      const c = map.getCenter();
-      const z = map.getZoom();
-      localStorage.setItem(LS_POS, JSON.stringify({lat:c.lat, lng:c.lng, zoom:z}));
-    }
-    function restoreMapPosition(){
-      try{
-        const raw = localStorage.getItem(LS_POS);
-        if(!raw) return false;
-        const pos = JSON.parse(raw);
-        map.setView([pos.lat, pos.lng], pos.zoom);
-        return true;
-      }catch(e){ return false; }
-    }
-    map.on("moveend", saveMapPosition);
-
-    // -------- Popup HTML --------
-    function starSvg(){
-      return `
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"
-            fill="transparent" stroke-width="2" stroke-linejoin="round"></path>
-        </svg>`;
-    }
-
-    function photoBlock(row){
-      const url = (row.photo_url || "").trim();
-      if(!url) return `<div class="photo"><div class="no-photo">Kein Foto verfügbar</div></div>`;
-      return `
-        <div class="photo">
-          <img src="${esc(url)}" alt="${esc(row.title || row.id || "Werbefläche")}" loading="lazy"
-            onerror="this.closest('.photo').innerHTML='<div class=&quot;no-photo&quot;>Foto konnte nicht geladen werden.</div>';">
-        </div>
-      `;
-    }
-
-    function popupHtml(row){
-      const id = String(row.id || "").trim();
-      const isActive = saved.has(id);
-
-      return `
-        <div class="billboard-popup">
-          <div class="popup-head">
-            <div style="flex:1 1 auto;">
-              <div class="popup-title">${esc(row.title || ("ID " + id))}</div>
-              ${row.address ? `<div class="popup-sub"><b>Adresse:</b> ${esc(row.address)}</div>` : ""}
-            </div>
-
-            ${id ? `
-              <div class="save" role="button" tabindex="0"
-                   data-id="${esc(id)}" data-active="${isActive ? "true" : "false"}"
-                   title="Merken">
-                <span class="star">${starSvg()}</span>
-                <span class="save-label">Merken</span>
-              </div>
-            ` : ""}
-          </div>
-
-          <div class="popup-details">
-            ${row.format ? `<div><b>Format:</b> ${esc(row.format)}</div>` : ""}
-            ${row.price ? `<div><b>Preis:</b> ${esc(row.price)}</div>` : ""}
-            ${row.leistungswert ? `<div><b>Leistungswert:</b> ${esc(row.leistungswert)}</div>` : ""}
-            ${id ? `<div style="opacity:.7"><b>ID:</b> ${esc(id)}</div>` : ""}
-          </div>
-
-          ${photoBlock(row)}
-
-          ${row.notes ? `<div class="notes"><b>Hinweise:</b><br>${esc(row.notes)}</div>` : ""}
-        </div>
-      `;
-    }
-
-    // Attach click handler when popup opens
-    map.on("popupopen", (e) => {
-      const el = e.popup.getElement();
-      if(!el) return;
-
-      const saveEl = el.querySelector(".save");
-      if(!saveEl) return;
-
-      const toggle = () => {
-        const id = saveEl.getAttribute("data-id");
-        if(!id) return;
-
-        const active = saveEl.getAttribute("data-active") === "true";
-        if(active){
-          saved.delete(id);
-          saveEl.setAttribute("data-active", "false");
-        }else{
-          saved.add(id);
-          saveEl.setAttribute("data-active", "true");
+      // если кто-то разделял пробелами — добьём:
+      const urls = [];
+      for (const p of parts) {
+        if (p.includes("http")) {
+          // иногда "url1 url2"
+          const maybe = p.split(/\s+/g).map(x => x.trim()).filter(Boolean);
+          urls.push(...maybe);
         }
-        saveSet(saved);
-      };
-
-      saveEl.addEventListener("click", toggle);
-      saveEl.addEventListener("keydown", (ev) => {
-        if(ev.key === "Enter" || ev.key === " "){
-          ev.preventDefault();
-          toggle();
-        }
-      });
-    });
-
-    // -------- Data loading / caching --------
-    function getCachedRows(){
-      if(CACHE_MINUTES === 0) return null;
-      try{
-        const raw = localStorage.getItem(LS_DATA);
-        if(!raw) return null;
-        const obj = JSON.parse(raw);
-        const ageMin = (Date.now() - obj.ts) / 1000 / 60;
-        if(ageMin < CACHE_MINUTES) return obj.rows;
-        localStorage.removeItem(LS_DATA);
-      }catch(e){}
-      return null;
-    }
-    function setCachedRows(rows){
-      if(CACHE_MINUTES === 0) return;
-      try{
-        localStorage.setItem(LS_DATA, JSON.stringify({ts:Date.now(), rows}));
-      }catch(e){}
-    }
-
-    function addRow(row){
-      const lat = toNum(row.lat);
-      const lon = toNum(row.lon);
-      if(!Number.isFinite(lat) || !Number.isFinite(lon)) return;
-
-      const marker = L.marker([lat, lon]);
-      marker.bindPopup(popupHtml(row), { maxWidth: 420 });
-      markers.addLayer(marker);
-    }
-
-    function processRows(rows){
-      markers.clearLayers();
-
-      let valid = 0;
-      rows.forEach((row) => {
-        row.leistungswert = row.leistungswert || row.Leistungswert || "";
-        row.photo_url = row.photo_url || row.photo || row.Photo_URL || "";
-        addRow(row);
-        valid++;
-      });
-
-      // Update UI
-      countEl.textContent = String(markers.getLayers().length);
-      updateTopButtons();
-
-      if(markers.getLayers().length > 0){
-        map.fitBounds(markers.getBounds().pad(0.15));
       }
-      hideLoading();
+      // уберём мусор и дубликаты
+      return [...new Set(urls)].filter(u => /^https?:\/\//i.test(u));
     }
 
-    function loadData(){
-      showLoading();
-      const cached = getCachedRows();
-      if(cached && cached.length){
-        processRows(cached);
+    function toNumber(x) {
+      const n = Number(String(x).replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    }
+
+    /***********************
+     * 3) ЛОГИКА ВЫБОРА ID
+     ***********************/
+    const selectedIds = new Set();
+
+    function syncSelectedUI() {
+      // hidden value: "12,18,44"
+      const ids = [...selectedIds];
+      const value = ids.join(",");
+      const hidden = document.getElementById("billboardIds");
+      hidden.value = value;
+      document.getElementById("debugHidden").textContent = value;
+
+      // chips
+      const chips = document.getElementById("selectedChips");
+      chips.innerHTML = "";
+      if (ids.length === 0) {
+        chips.innerHTML = `<div class="hint">Пока ничего не выбрано.</div>`;
         return;
       }
+      for (const id of ids) {
+        const el = document.createElement("span");
+        el.className = "chip";
+        el.textContent = id;
+        el.title = "Нажмите, чтобы убрать";
+        el.onclick = () => {
+          selectedIds.delete(id);
+          syncSelectedUI();
+        };
+        chips.appendChild(el);
+      }
+    }
 
-      Papa.parse(CSV_URL, {
-        download:true,
-        header:true,
-        skipEmptyLines:true,
-        complete:(results) => {
-          if(!results.data || !results.data.length){
-            hideLoading();
-            alert("Keine Daten gefunden. Bitte prüfen Sie die CSV-URL.");
-            return;
-          }
-          setCachedRows(results.data);
-          processRows(results.data);
-        },
-        error:(err) => {
-          hideLoading();
-          console.error(err);
-          alert("Fehler beim Laden der Daten. Bitte prüfen Sie die CSV-URL und die Veröffentlichungseinstellungen.");
-        }
+    function toggleId(id) {
+      if (!id) return;
+      if (selectedIds.has(id)) selectedIds.delete(id);
+      else selectedIds.add(id);
+      syncSelectedUI();
+    }
+
+    document.getElementById("clearBtn").addEventListener("click", () => {
+      selectedIds.clear();
+      syncSelectedUI();
+    });
+
+    document.getElementById("copyBtn").addEventListener("click", async () => {
+      const value = [...selectedIds].join(",");
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch {
+        // fallback
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+    });
+
+    syncSelectedUI();
+
+    /***********************
+     * 4) КАРТА
+     ***********************/
+    const map = L.map("map", { preferCanvas: true }).setView([50.584, 8.678], 11); // старт (пример: Гиссен)
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 20,
+      attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
+
+    const markersLayer = L.layerGroup().addTo(map);
+
+    /***********************
+     * 5) ЗАГРУЗКА ДАННЫХ ИЗ GOOGLE SHEETS (GVIZ JSON)
+     ***********************/
+    async function loadSheetRows() {
+      // GViz endpoint (не требует API key, если лист опубликован)
+      const url =
+        `https://docs.google.com/spreadsheets/d/${encodeURIComponent(SHEET_ID)}/gviz/tq?` +
+        `tqx=out:json&sheet=${encodeURIComponent(SHEET_NAME)}`;
+
+      const res = await fetch(url);
+      if (!res.ok) throw new Error("Не удалось загрузить таблицу: " + res.status);
+      const text = await res.text();
+
+      // Google возвращает "google.visualization.Query.setResponse(...);"
+      const jsonText = text.substring(text.indexOf("{"), text.lastIndexOf("}") + 1);
+      const data = JSON.parse(jsonText);
+
+      const cols = data.table.cols.map(c => c.label);
+      const rows = data.table.rows.map(r => r.c.map(cell => (cell ? cell.v : "")));
+
+      // в объект по заголовкам
+      return rows.map(values => {
+        const obj = {};
+        cols.forEach((k, i) => obj[k] = values[i]);
+        return obj;
       });
     }
 
-    // Init
-    restoreMapPosition();
-    loadData();
+    function buildPopupHtml(row) {
+      const id = row[COL_ID];
+      const photos = parsePhotoUrls(row[COL_PHOTO]);
 
-    // Debug helper
-    window.reloadBillboards = function(){
-      localStorage.removeItem(LS_DATA);
-      loadData();
-    };
-  })();
+      const title = `<div class="popup-title">Щит ID: ${esc(id)}</div>`;
+      const meta = `<div class="popup-meta">Клик по popup или маркеру: добавить/убрать ID</div>`;
+
+      let imgs = "";
+      if (photos.length > 0) {
+        imgs = photos.slice(0, 6).map(u =>
+          `<img class="popup-img" src="${esc(u)}" loading="lazy" referrerpolicy="no-referrer"
+                onerror="this.style.display='none';" />`
+        ).join("");
+      } else {
+        imgs = `<div class="popup-meta" style="margin-top:6px;">Фото не указано</div>`;
+      }
+
+      return `${title}${meta}${imgs}`;
+    }
+
+    async function renderMarkers() {
+      markersLayer.clearLayers();
+
+      const rows = await loadSheetRows();
+
+      const bounds = [];
+
+      for (const row of rows) {
+        const id = String(row[COL_ID] ?? "").trim();
+        const lat = toNumber(row[COL_LAT]);
+        const lng = toNumber(row[COL_LNG]);
+
+        if (!id || lat === null || lng === null) continue;
+
+        const marker = L.marker([lat, lng], { title: `ID ${id}` });
+
+        const popupHtml = buildPopupHtml(row);
+        marker.bindPopup(popupHtml, { maxWidth: 300 });
+
+        // ✅ ВЫБОР: по клику на маркер — переключаем ID и открываем popup
+        marker.on("click", () => {
+          toggleId(id);
+        });
+
+        // ✅ И по клику внутри popup — тоже переключаем (удобно на мобилке)
+        marker.on("popupopen", (e) => {
+          const el = e.popup.getElement();
+          if (!el) return;
+          el.style.cursor = "pointer";
+          const handler = () => toggleId(id);
+          el.addEventListener("click", handler, { once: false });
+        });
+
+        marker.addTo(markersLayer);
+        bounds.push([lat, lng]);
+      }
+
+      if (bounds.length > 0) map.fitBounds(bounds, { padding: [30, 30] });
+    }
+
+    renderMarkers().catch(err => {
+      console.error(err);
+      alert("Ошибка загрузки карты/таблицы. Проверь: опубликован ли Google Sheet и правильные ли SHEET_ID/SHEET_NAME.");
+    });
   </script>
 </body>
 </html>
