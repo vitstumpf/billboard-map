@@ -1,255 +1,440 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Billboard Map</title>
-
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Werbeflächen Karte</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css">
   <style>
-    @keyframes bbspin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
-    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:#fff;}
-    .wrap{max-width:1200px;margin:0 auto;padding:16px;}
-    #status{font:14px/1.4 system-ui,-apple-system,Segoe UI,Roboto,Arial;padding:10px 12px;border:1px dashed #bbb;border-radius:10px;margin:10px 0;background:#fff;}
-    #map{width:100%;height:75vh;min-height:600px;border-radius:12px;overflow:hidden;background:#f3f3f3;}
-    #loading{position:fixed;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;}
-    #loading .box{background:rgba(255,255,255,.96);padding:18px 22px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,.15);text-align:center;}
-    #loading .spin{width:40px;height:40px;border:3px solid #f3f3f3;border-top:3px solid #0b6bcb;border-radius:50%;margin:0 auto 10px;animation:bbspin 1s linear infinite;}
-    #loading .txt{font-size:14px;color:#666;}
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
 
-    /* Popup */
-    .bb-popup{min-width:240px;max-width:340px;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;}
-    .bb-title{font-weight:700;font-size:16px;margin-bottom:6px;color:#222;}
-    .bb-addr{font-size:13px;margin-bottom:8px;}
-    .bb-details{font-size:13px;line-height:1.5;margin-bottom:10px;}
-    .bb-details div{margin:4px 0;}
-    .bb-photo{margin:10px 0;}
-    .bb-photo img{width:100%;max-width:320px;height:auto;border-radius:10px;display:block;}
-    .bb-nophoto{margin:10px 0;font-size:12px;opacity:.75;font-style:italic;}
-    .bb-notes{font-size:12px;margin:8px 0;opacity:.9;padding:8px;background:#f5f5f5;border-radius:6px;}
-    .bb-btn{display:inline-block;text-decoration:none;padding:12px 16px;border-radius:10px;font-weight:700;font-size:13px;background:#0b6bcb;color:#fff;border:none;cursor:pointer;text-align:center;margin-top:10px;width:100%;box-sizing:border-box;}
-    .bb-btn:hover{background:#084c8d;}
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background: #f5f5f5;
+    }
+
+    #map {
+      width: 100%;
+      height: 100vh;
+    }
+
+    /* Popup styles */
+    .billboard-popup {
+      min-width: 240px;
+      max-width: 340px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+    .billboard-popup__title {
+      font-weight: 700;
+      font-size: 16px;
+      margin-bottom: 6px;
+      color: #222;
+    }
+    .billboard-popup__address {
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .billboard-popup__details {
+      font-size: 13px;
+      line-height: 1.5;
+      margin-bottom: 10px;
+    }
+    .billboard-popup__details div {
+      margin: 4px 0;
+    }
+    .billboard-popup__photo {
+      margin: 10px 0;
+    }
+    .billboard-popup__photo img {
+      width: 100%;
+      max-width: 320px;
+      height: auto;
+      border-radius: 10px;
+      display: block;
+    }
+    .billboard-popup__no-photo {
+      margin: 10px 0;
+      font-size: 12px;
+      opacity: 0.75;
+      font-style: italic;
+    }
+    .billboard-popup__notes {
+      font-size: 12px;
+      margin: 8px 0;
+      opacity: 0.9;
+      padding: 8px;
+      background: #f5f5f5;
+      border-radius: 6px;
+    }
+    .billboard-popup__button {
+      display: inline-block;
+      text-decoration: none;
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-weight: 700;
+      font-size: 13px;
+      background: #0b6bcb;
+      color: #fff;
+      border: none;
+      transition: background 0.2s;
+      cursor: pointer;
+      text-align: center;
+      margin-top: 10px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .billboard-popup__button:hover {
+      background: #084c8d;
+    }
+
+    /* Loading overlay */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255, 255, 255, 0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      flex-direction: column;
+    }
+    .loading-overlay.hidden {
+      display: none;
+    }
+    .spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #0b6bcb;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 15px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+      font-size: 16px;
+      color: #666;
+      font-weight: 500;
+    }
+
+    /* Error message */
+    .error-overlay {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 9999;
+      background: white;
+      padding: 30px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+      max-width: 450px;
+      text-align: center;
+      display: none;
+    }
+    .error-overlay.active {
+      display: block;
+    }
+    .error-icon {
+      font-size: 60px;
+      margin-bottom: 15px;
+    }
+    .error-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #d32f2f;
+      margin-bottom: 10px;
+    }
+    .error-message {
+      font-size: 14px;
+      color: #666;
+      margin-bottom: 20px;
+      line-height: 1.5;
+    }
+    .error-button {
+      background: #0b6bcb;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 14px;
+      transition: background 0.2s;
+    }
+    .error-button:hover {
+      background: #084c8d;
+    }
   </style>
 </head>
-
 <body>
-  <div class="wrap">
-    <div id="status">⏳ Karte wird geladen…</div>
-    <div id="map"></div>
-  </div>
 
-  <div id="loading">
-    <div class="box">
-      <div class="spin"></div>
-      <div class="txt">Werbeflächen werden geladen…</div>
-    </div>
-  </div>
+<div class="loading-overlay" id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">Werbeflächen werden geladen...</div>
+</div>
 
-  <script>
-  (function(){
-    const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
-    const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
+<div class="error-overlay" id="error">
+  <div class="error-icon">⚠️</div>
+  <div class="error-title">Fehler beim Laden</div>
+  <div class="error-message" id="error-message"></div>
+  <button class="error-button" onclick="location.reload()">Erneut versuchen</button>
+</div>
 
-    const CACHE_MINUTES = 15;
-    const DEFAULT_CENTER = [51.0, 10.0];
-    const DEFAULT_ZOOM = 6;
+<div id="map"></div>
 
-    const statusEl = document.getElementById("status");
-    const loadingEl = document.getElementById("loading");
-    const setStatus = (m)=> statusEl.textContent = m;
-    const showLoading = ()=> loadingEl.style.display="flex";
-    const hideLoading = ()=> loadingEl.style.display="none";
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 
-    const log = (...a)=> console.log("[BBMap]",...a);
+<script>
+(function () {
+  console.log("=== Billboard Map v2.0 ===");
 
-    function loadCSS(url){
-      return new Promise((res,rej)=>{
-        const l=document.createElement("link");
-        l.rel="stylesheet"; l.href=url;
-        l.onload=res; l.onerror=()=>rej(new Error("CSS konnte nicht geladen werden: "+url));
-        document.head.appendChild(l);
-      });
+  // ========== CONFIGURATION ==========
+  const GOOGLE_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
+  const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
+  const CORS_PROXY = "https://api.allorigins.win/raw?url=";
+  const MAP_CENTER = [51.0, 10.0];
+  const MAP_ZOOM = 6;
+  const TIMEOUT_MS = 15000;
+  // ===================================
+
+  const loadingEl = document.getElementById('loading');
+  const errorEl = document.getElementById('error');
+  const errorMessageEl = document.getElementById('error-message');
+
+  function hideLoading() {
+    if (loadingEl) loadingEl.classList.add('hidden');
+  }
+
+  function showError(message) {
+    console.error("Error:", message);
+    hideLoading();
+    if (errorMessageEl) errorMessageEl.textContent = message;
+    if (errorEl) errorEl.classList.add('active');
+  }
+
+  // Initialize map
+  console.log("Initializing map...");
+  const map = L.map('map', {
+    center: MAP_CENTER,
+    zoom: MAP_ZOOM,
+    zoomControl: true,
+    scrollWheelZoom: true
+  });
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>'
+  }).addTo(map);
+
+  // Marker clustering
+  const markers = L.markerClusterGroup({
+    maxClusterRadius: 50,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+    zoomToBoundsOnClick: true
+  });
+  map.addLayer(markers);
+
+  // Utility functions
+  function toNum(v) {
+    if (!v) return NaN;
+    const s = String(v).trim().replace(",", ".");
+    return Number(s);
+  }
+
+  function esc(s) {
+    return String(s || "")
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function buildFormLink(row) {
+    const params = [];
+    if (row.id) params.push("ref_id=" + encodeURIComponent(row.id));
+    if (row.title) params.push("title=" + encodeURIComponent(row.title));
+    if (row.address) params.push("address=" + encodeURIComponent(row.address));
+    if (row.price) params.push("price=" + encodeURIComponent(row.price));
+    if (row.format) params.push("format=" + encodeURIComponent(row.format));
+    if (row.leistungswert) params.push("leistungswert=" + encodeURIComponent(row.leistungswert));
+
+    return params.length > 0 ? FORM_URL + "?" + params.join("&") : FORM_URL;
+  }
+
+  function popupHtml(row) {
+    const title = esc(row.title || "");
+    const address = esc(row.address || "");
+    const format = esc(row.format || "");
+    const price = esc(row.price || "");
+    const lw = esc(row.leistungswert || "");
+    const notes = esc(row.notes || "");
+    const photo = (row.photo_url || "").trim();
+    const btnUrl = buildFormLink(row);
+
+    let html = '<div class="billboard-popup">';
+    html += '<div class="billboard-popup__title">' + (title || "ID " + esc(row.id || "?")) + '</div>';
+
+    if (address) {
+      html += '<div class="billboard-popup__address"><b>📍 Adresse:</b> ' + address + '</div>';
     }
-    function loadScript(url){
-      return new Promise((res,rej)=>{
-        const s=document.createElement("script");
-        s.src=url; s.async=true;
-        s.onload=res; s.onerror=()=>rej(new Error("Script konnte nicht geladen werden: "+url));
-        document.head.appendChild(s);
-      });
+
+    html += '<div class="billboard-popup__details">';
+    if (format) html += '<div><b>Format:</b> ' + format + '</div>';
+    if (price) html += '<div><b>Preis:</b> ' + price + '</div>';
+    if (lw) html += '<div><b>Leistungswert:</b> ' + lw + '</div>';
+    if (row.id) html += '<div style="opacity:.7"><b>ID:</b> ' + esc(row.id) + '</div>';
+    html += '</div>';
+
+    if (photo) {
+      html += '<div class="billboard-popup__photo"><img src="' + esc(photo) + '" alt="' + title + '" loading="lazy"></div>';
+    } else {
+      html += '<div class="billboard-popup__no-photo">Kein Foto verfügbar</div>';
     }
-    const toNum=(v)=> Number(String(v??"").trim().replace(",","."));
-    const esc=(s)=> String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#39;");
 
-    function normalizeRow(row){
-      row.id = String(row.id ?? "").trim();
-      row.title = row.title ?? "";
-      row.address = row.address ?? "";
-      row.lat = row.lat ?? "";
-      row.lon = row.lon ?? "";
-      row.price = row.price ?? "";
-      row.format = row.format ?? "";
-      row.notes = row.notes ?? "";
-      row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
-      row.photo_url = row.photo_url || row.Photo_URL || row.photo || row.photoUrl || "";
+    if (notes) {
+      html += '<div class="billboard-popup__notes"><b>ℹ️ Hinweise:</b><br>' + notes + '</div>';
+    }
 
-      // Drive: uc?id= -> uc?export=view&id=
-      const p = String(row.photo_url || "").trim();
-      if (p.startsWith("https://drive.google.com/uc?id=")) {
-        const fileId = p.split("uc?id=")[1];
-        row.photo_url = "https://drive.google.com/uc?export=view&id=" + encodeURIComponent(fileId);
+    html += '<a href="' + esc(btnUrl) + '" target="_blank" rel="noopener" class="billboard-popup__button">📧 Angebot anfordern</a>';
+    html += '</div>';
+
+    return html;
+  }
+
+  function addMarker(row) {
+    const lat = toNum(row.lat);
+    const lon = toNum(row.lon);
+
+    if (!isFinite(lat) || !isFinite(lon)) {
+      console.warn("Invalid coordinates:", row);
+      return;
+    }
+
+    const marker = L.marker([lat, lon]);
+    marker.bindPopup(popupHtml(row), { maxWidth: 380 });
+    markers.addLayer(marker);
+  }
+
+  function parseCSV(text) {
+    const lines = text.split(/
+?
+/);
+    if (lines.length < 2) return [];
+
+    const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+    const rows = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i].trim();
+      if (!line) continue;
+
+      const values = line.split(',');
+      const row = {};
+
+      headers.forEach((header, index) => {
+        row[header] = (values[index] || "").trim().replace(/^"|"$/g, '');
+      });
+
+      // Normalize field names
+      row.leistungswert = row.leistungswert || row.Leistungswert || "";
+      row.photo_url = row.photo_url || row.photo || "";
+
+      if (row.lat && row.lon) {
+        rows.push(row);
       }
-      return row;
     }
 
-    function buildFormLink(row){
-      const context =
-        "ID: " + (row.id||"") + "\n" +
-        "Titel: " + (row.title||"") + "\n" +
-        "Adresse: " + (row.address||"") + "\n" +
-        "Preis: " + (row.price||"") + "\n" +
-        "Format: " + (row.format||"") + "\n" +
-        "Leistungswert: " + (row.leistungswert||"");
-      const params = new URLSearchParams({ context });
-      return FORM_URL + (FORM_URL.includes("?") ? "&" : "?") + params.toString();
-    }
+    return rows;
+  }
 
-    function popupHtml(row){
-      const title = esc(row.title || "");
-      const address = esc(row.address || "");
-      const format = esc(row.format || "");
-      const price = esc(row.price || "");
-      const lw = esc(row.leistungswert || "");
-      const notes = esc(row.notes || "");
-      const photo = (row.photo_url || "").trim();
-      const btnUrl = buildFormLink(row);
+  // Load data with timeout
+  function loadData() {
+    console.log("Loading CSV...");
 
-      const photoBlock = photo
-        ? `<div class="bb-photo"><img src="${esc(photo)}" alt="${title}" loading="lazy"></div>`
-        : `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
+    const csvUrl = CORS_PROXY + encodeURIComponent(GOOGLE_SHEET_URL);
+    console.log("URL:", csvUrl);
 
-      return `
-        <div class="bb-popup">
-          <div class="bb-title">${title || ("ID " + esc(row.id || "?"))}</div>
-          ${address ? `<div class="bb-addr"><b>📍 Adresse:</b> ${address}</div>` : ""}
-          <div class="bb-details">
-            ${format ? `<div><b>Format:</b> ${format}</div>` : ""}
-            ${price ? `<div><b>Preis:</b> ${price}</div>` : ""}
-            ${lw ? `<div><b>Leistungswert:</b> ${lw}</div>` : ""}
-            ${row.id ? `<div style="opacity:.7"><b>ID:</b> ${esc(row.id)}</div>` : ""}
-          </div>
-          ${photoBlock}
-          ${notes ? `<div class="bb-notes"><b>ℹ️ Hinweise:</b><br>${notes}</div>` : ""}
-          <a href="${esc(btnUrl)}" target="_blank" rel="noopener" class="bb-btn">📧 Angebot anfordern</a>
-        </div>
-      `;
-    }
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
 
-    function getCachedRows(){
-      if (CACHE_MINUTES===0) return null;
-      try{
-        const raw=localStorage.getItem("bb_map_cache_v1");
-        if(!raw) return null;
-        const obj=JSON.parse(raw);
-        const ageMin=(Date.now()-obj.ts)/1000/60;
-        if(ageMin<=CACHE_MINUTES && Array.isArray(obj.rows)) return obj.rows;
-        localStorage.removeItem("bb_map_cache_v1");
-      }catch(e){ log("Cache read error",e); }
-      return null;
-    }
-    function setCachedRows(rows){
-      if (CACHE_MINUTES===0) return;
-      try{ localStorage.setItem("bb_map_cache_v1", JSON.stringify({ts:Date.now(), rows})); }
-      catch(e){ log("Cache write error",e); }
-    }
-    function saveMapPos(map){
-      try{
-        const c=map.getCenter();
-        localStorage.setItem("bb_map_pos_v1", JSON.stringify({lat:c.lat,lng:c.lng,zoom:map.getZoom()}));
-      }catch{}
-    }
-    function restoreMapPos(map){
-      try{
-        const raw=localStorage.getItem("bb_map_pos_v1");
-        if(!raw) return false;
-        const p=JSON.parse(raw);
-        if(!p) return false;
-        map.setView([p.lat,p.lng], p.zoom);
-        return true;
-      }catch{ return false; }
-    }
+    fetch(csvUrl, {
+      signal: controller.signal,
+      headers: {
+        'Accept': 'text/csv,text/plain,*/*'
+      }
+    })
+    .then(response => {
+      clearTimeout(timeoutId);
+      console.log("Response status:", response.status);
 
-    async function init(){
-      setStatus("⏳ Bibliotheken werden geladen…");
-      showLoading();
+      if (!response.ok) {
+        throw new Error("HTTP " + response.status);
+      }
 
-      await loadCSS("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
-      await loadCSS("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css");
-      await loadCSS("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css");
+      return response.text();
+    })
+    .then(text => {
+      console.log("CSV loaded, length:", text.length);
 
-      await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
-      await loadScript("https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js");
+      const rows = parseCSV(text);
+      console.log("Parsed rows:", rows.length);
 
-      if(!window.L) throw new Error("Leaflet ist nicht verfügbar.");
-      if(!window.Papa) throw new Error("PapaParse ist nicht verfügbar.");
-      if(!L.markerClusterGroup) throw new Error("MarkerCluster ist nicht verfügbar.");
-
-      setStatus("⏳ Karte wird initialisiert…");
-
-      const map = L.map("map",{scrollWheelZoom:true,zoomControl:true}).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",{
-        maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-      }).addTo(map);
-
-      const clusters = L.markerClusterGroup({
-        maxClusterRadius:50,spiderfyOnMaxZoom:true,showCoverageOnHover:false,zoomToBoundsOnClick:true
-      });
-      map.addLayer(clusters);
-      map.on("moveend", ()=>saveMapPos(map));
-      restoreMapPos(map);
-
-      const renderRows = (rows)=>{
-        clusters.clearLayers();
-        let added=0;
-        for(const raw of rows){
-          const row=normalizeRow(raw);
-          const lat=toNum(row.lat), lon=toNum(row.lon);
-          if(!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-          const m=L.marker([lat,lon]);
-          m.bindPopup(popupHtml(row),{maxWidth:380});
-          clusters.addLayer(m);
-          added++;
-        }
-        hideLoading();
-        if(added>0){
-          map.fitBounds(clusters.getBounds().pad(0.15));
-          setStatus("✅ Fertig. Werbeflächen: "+added);
-        }else{
-          setStatus("⚠️ Keine gültigen Punkte. Bitte lat/lon prüfen.");
-        }
-      };
-
-      const cached=getCachedRows();
-      if(cached){
-        setStatus("⏳ Daten aus Cache werden geladen…");
-        renderRows(cached);
+      if (rows.length === 0) {
+        showError("Keine Daten in der Tabelle gefunden. Bitte fügen Sie Einträge mit den Spalten 'lat', 'lon', 'title' hinzu.");
         return;
       }
 
-      setStatus("⏳ Daten werden aus Google Sheets geladen…");
-      Papa.parse(CSV_URL,{
-        download:true,header:true,skipEmptyLines:true,
-        complete:(r)=>{ const rows=r.data||[]; setCachedRows(rows); renderRows(rows); },
-        error:(e)=>{ hideLoading(); log(e); setStatus("❌ CSV konnte nicht geladen werden. Link/Publikation prüfen."); }
+      let validCount = 0;
+      rows.forEach(row => {
+        addMarker(row);
+        validCount++;
       });
-    }
 
-    init().catch(err=>{
+      console.log("Added markers:", markers.getLayers().length);
+
+      if (markers.getLayers().length > 0) {
+        map.fitBounds(markers.getBounds().pad(0.15));
+      } else {
+        showError("Keine gültigen Koordinaten gefunden. Überprüfen Sie die Spalten 'lat' und 'lon'.");
+        return;
+      }
+
       hideLoading();
-      setStatus("❌ Fehler: "+err.message);
-      log(err);
+      console.log("Map ready!");
+    })
+    .catch(err => {
+      clearTimeout(timeoutId);
+      console.error("Load error:", err);
+
+      if (err.name === 'AbortError') {
+        showError("Zeitüberschreitung beim Laden. Bitte überprüfen Sie Ihre Internetverbindung und versuchen Sie es erneut.");
+      } else {
+        showError("Fehler beim Laden der Daten: " + err.message + ". Stellen Sie sicher, dass die Google Sheets Tabelle veröffentlicht ist (File → Share → Publish to web → CSV).");
+      }
     });
-  })();
-  </script>
+  }
+
+  // Start loading
+  loadData();
+
+  console.log("=== Initialization complete ===");
+})();
+</script>
+
 </body>
 </html>
