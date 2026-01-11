@@ -135,6 +135,10 @@
 
       overflow: hidden;    /* keep inside map */
       touch-action: pan-y; /* allow vertical scroll on mobile */
+
+      /* >>> ADDED (only): make panel layout fixed so inner scroll works <<< */
+      display: none;
+      flex-direction: column;
     }
 
     /* panel header */
@@ -166,35 +170,25 @@
 
     .p-body{
       padding: 10px 14px 14px;
-      max-height: calc(100% - 54px);
       overflow: auto;
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
 
-      /* hide scrollbar visually (still scrollable) */
-      scrollbar-width: none;
+      /* >>> ADDED (only): force inner scrolling inside the panel <<< */
+      flex: 1 1 auto;
+      min-height: 0;
+
+      /* Desktop: show a small scrollbar INSIDE the panel */
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,.35) transparent;
     }
-    .p-body::-webkit-scrollbar{ width: 0; height: 0; }
-/* Desktop: show a small visible scrollbar in the panel body */
-@media (min-width: 641px){
-  .p-body{
-    scrollbar-width: thin;                 /* Firefox */
-    scrollbar-color: rgba(0,0,0,.35) transparent;
-  }
-  .p-body::-webkit-scrollbar{
-    width: 8px;                            /* Chrome/Edge/Safari */
-  }
-  .p-body::-webkit-scrollbar-track{
-    background: transparent;
-  }
-  .p-body::-webkit-scrollbar-thumb{
-    background: rgba(0,0,0,.35);
-    border-radius: 10px;
-  }
-  .p-body::-webkit-scrollbar-thumb:hover{
-    background: rgba(0,0,0,.5);
-  }
-}
+    .p-body::-webkit-scrollbar{ width: 8px; height: 8px; }
+    .p-body::-webkit-scrollbar-track{ background: transparent; }
+    .p-body::-webkit-scrollbar-thumb{
+      background: rgba(0,0,0,.35);
+      border-radius: 10px;
+    }
+    .p-body::-webkit-scrollbar-thumb:hover{ background: rgba(0,0,0,.5); }
 
     .p-addr{ font-size: 13px; margin: 6px 0 10px; color:#333; }
     .p-details{ font-size: 13px; line-height: 1.5; }
@@ -280,6 +274,10 @@
         max-height: 240px;
         object-fit: cover;
       }
+
+      /* Mobile: hide scrollbar visually (still scrollable) */
+      .p-body{ scrollbar-width: none; }
+      .p-body::-webkit-scrollbar{ width: 0; height: 0; }
     }
 
     /* Toast */
