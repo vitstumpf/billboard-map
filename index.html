@@ -1,101 +1,679 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8">
-  <title>Billboard Map</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Werbeflächen Karte</title>
 
   <style>
-    :root{
-      --bg:#0f172a;
-      --card:#111827;
-      --muted:#94a3b8;
-      --text:#e5e7eb;
-      --accent:#22c55e;
-      --line:#1f2937;
+    html, body { height: 100%; margin: 0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#fff; }
+
+    @keyframes bbspin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 12px 16px; box-sizing: border-box; }
+
+    #status{
+      font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      padding: 10px 12px;
+      border: 1px dashed #bbb;
+      border-radius: 10px;
+      margin: 10px 0;
+      background: #fff;
     }
-    *{box-sizing:border-box}
-    html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
-    .wrap{max-width:1200px;margin:0 auto;padding:12px 16px}
 
-    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}
-    header h1{font-size:18px;margin:0;font-weight:600}
-    .controls{display:flex;gap:8px;flex-wrap:wrap}
-    .controls input,.controls select,.controls button{
-      background:#020617;border:1px solid var(--line);color:var(--text);
-      padding:8px 10px;border-radius:8px;font-size:13px
+    /* Top toolbar */
+    .toolbar{
+      display:flex;
+      align-items:flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      margin: 10px 0 12px;
+      flex-wrap: wrap;
     }
-    .controls button{cursor:pointer}
-    .controls button.primary{background:#16a34a;border-color:#16a34a}
+    .toolbar .left{
+      display:flex;
+      align-items:center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap: 8px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid #ddd;
+      background:#fff;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    }
+    .pill b{ font-weight: 700; }
+    .pill small{ color:#666; }
 
-    .layout{display:grid;grid-template-columns: 1.1fr .9fr; gap:12px}
-    @media (max-width:900px){.layout{grid-template-columns:1fr}}
+    .toolbar input[type="text"], .toolbar select{
+      font: 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      outline: none;
+      min-width: 180px;
+      background:#fff;
+    }
+    .toolbar button{
+      font: 14px/1.2 system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      background:#fff;
+      cursor:pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    }
+    .toolbar button.primary{
+      background:#2563eb;
+      color:#fff;
+      border-color:#2563eb;
+    }
 
-    #map{height:70vh;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
+    /* Layout */
+    .layout{
+      display:grid;
+      grid-template-columns: 1.05fr .95fr;
+      gap: 12px;
+    }
+    @media (max-width: 980px){
+      .layout{ grid-template-columns: 1fr; }
+    }
 
+    #map{
+      height: 72vh;
+      border-radius: 16px;
+      overflow:hidden;
+      border: 1px solid #e6e6e6;
+      position: relative;
+      background:#f7f7f7;
+    }
+
+    /* Panel (popup-like details) */
     .panel{
-      height:70vh;background:var(--card);border:1px solid var(--line);
-      border-radius:14px;display:flex;flex-direction:column;overflow:hidden
+      height: 72vh;
+      border-radius: 16px;
+      border: 1px solid #e6e6e6;
+      overflow:hidden;
+      display:flex;
+      flex-direction: column;
+      background:#fff;
+      position: relative;
     }
-    .p-head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;justify-content:space-between}
-    .p-head h2{margin:0;font-size:14px;font-weight:600}
-    .p-body{
-      padding:10px 12px;
-      overflow:auto;
-      line-height:1.45;
-      font-size:13px;
+    .p-head{
+      padding: 10px 14px;
+      border-bottom: 1px solid #eee;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+      min-height: 54px;
+      background: #fff;
     }
+    .p-title{
+      font-weight: 900;
+      font-size: 16px;
+      line-height: 1.2;
+      color:#222;
+    }
+    .p-close{
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      padding: 0 4px;
+      color:#444;
+    }
+    .p-close:hover{ color:#000; }
 
-    /* show small scrollbar when content overflows */
-    scrollbar-width: thin;          /* Firefox */
-    scrollbar-color: #bdbdbd transparent;
+    .p-body{
+      padding: 10px 14px 14px;
+      max-height: calc(100% - 54px);
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
+
+      /* show small scrollbar when content overflows */
+      scrollbar-width: thin; /* Firefox */
+      scrollbar-color: #bdbdbd transparent; /* Firefox */
     }
-    .p-body::-webkit-scrollbar{
-      width: 6px;
-    }
+    .p-body::-webkit-scrollbar{ width: 6px; }
     .p-body::-webkit-scrollbar-thumb{
       background: #bdbdbd;
       border-radius: 8px;
     }
-    .p-body::-webkit-scrollbar-track{
-      background: transparent;
+    .p-body::-webkit-scrollbar-track{ background: transparent; }
+
+    .p-addr{ font-size: 13px; margin: 6px 0 10px; color:#333; }
+    .p-details{ font-size: 13px; line-height: 1.5; }
+    .p-details div{ margin: 4px 0; }
+
+    .p-photo{ margin: 10px 0 8px; }
+    .p-photo img{
+      width: 100%;
+      height: auto;
+      display:block;
+      border-radius: 12px;
+      background:#fafafa;
     }
 
-    .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px}
-    .kv div.key{color:var(--muted)}
-    .kv div.val{word-break:break-word}
+    .p-actions{
+      display:flex;
+      flex-wrap:wrap;
+      gap: 8px;
+      margin: 10px 0 0;
+    }
+    .p-actions a, .p-actions button{
+      display:inline-flex;
+      align-items:center;
+      gap: 8px;
+      text-decoration:none;
+      padding: 8px 10px;
+      border-radius: 10px;
+      border: 1px solid #ddd;
+      background:#fff;
+      color:#111;
+      font-size: 13px;
+      cursor:pointer;
+      box-shadow: 0 1px 2px rgba(0,0,0,.04);
+    }
+    .p-actions a.primary{
+      background:#16a34a;
+      border-color:#16a34a;
+      color:#fff;
+    }
 
-    footer{color:var(--muted);font-size:12px;margin-top:10px}
+    /* simple modal */
+    .modal-backdrop{
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.35);
+      display:none;
+      align-items:center;
+      justify-content:center;
+      z-index: 9999;
+      padding: 16px;
+    }
+    .modal{
+      width: min(900px, 100%);
+      max-height: 85vh;
+      overflow:auto;
+      background:#fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+      border: 1px solid rgba(0,0,0,.1);
+    }
+    .modal .m-head{
+      padding: 10px 14px;
+      border-bottom: 1px solid #eee;
+      display:flex;
+      align-items:center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+    .modal .m-head h3{ margin:0; font-size: 15px; }
+    .modal .m-body{ padding: 12px 14px 14px; }
+
+    /* CSV preview table */
+    table{
+      width:100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    th, td{
+      border-bottom: 1px solid #eee;
+      padding: 6px 8px;
+      text-align:left;
+      vertical-align: top;
+      word-break: break-word;
+    }
+    th{
+      position: sticky;
+      top: 0;
+      background: #fff;
+      z-index: 1;
+    }
+
+    /* loader */
+    .loader{
+      display:inline-block;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      border: 2px solid #c7c7c7;
+      border-top-color: #222;
+      animation: bbspin .8s linear infinite;
+      vertical-align: -3px;
+      margin-right: 8px;
+    }
+
+    /* map controls / legend */
+    .legend{
+      position:absolute;
+      left: 10px;
+      bottom: 10px;
+      background: rgba(255,255,255,.95);
+      border: 1px solid #e6e6e6;
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-size: 12px;
+      box-shadow: 0 6px 20px rgba(0,0,0,.08);
+      max-width: 240px;
+    }
+    .legend b{ display:block; margin-bottom: 4px; }
+    .legend .row{ display:flex; gap: 6px; align-items:center; margin: 3px 0; }
+    .dot{ width:10px; height:10px; border-radius:50%; background:#2563eb; display:inline-block; }
+
   </style>
 </head>
 
 <body>
   <div class="wrap">
-    <header>
-      <h1>Billboard Map</h1>
-      <div class="controls">
-        <input id="q" placeholder="Suche…">
-        <select id="city"></select>
-        <button class="primary" id="reset">Reset</button>
+
+    <div class="toolbar">
+      <div class="left">
+        <div class="pill">
+          <b>Werbeflächen</b>
+          <small id="countPill">0</small>
+        </div>
+
+        <input id="search" type="text" placeholder="Suche (ID, Ort, Straße, Notizen …)" />
+        <select id="citySelect">
+          <option value="">Alle Orte</option>
+        </select>
+
+        <button id="btnReset" class="primary">Reset</button>
+        <button id="btnList">Liste</button>
       </div>
-    </header>
 
-    <div class="layout">
-      <div id="map"></div>
-
-      <aside class="panel" id="panel">
-        <div class="p-head">
-          <h2>Informationen</h2>
-        </div>
-        <div class="p-body" id="info">
-          <div style="color:var(--muted)">Wähle einen Marker auf der Karte…</div>
-        </div>
-      </aside>
+      <div class="right">
+        <div id="status"><span class="loader"></span> Lädt Daten …</div>
+      </div>
     </div>
 
-    <footer>© Demo</footer>
+    <div class="layout">
+      <div id="map">
+        <div class="legend" id="legend">
+          <b>Hinweis</b>
+          <div class="row"><span class="dot"></span> Marker anklicken für Details</div>
+        </div>
+      </div>
+
+      <div class="panel" id="panel">
+        <div class="p-head">
+          <div>
+            <div class="p-title" id="pTitle">Details</div>
+            <div class="p-addr" id="pAddr">Bitte Marker wählen …</div>
+          </div>
+          <button class="p-close" id="pClose" title="Schließen" aria-label="Schließen">×</button>
+        </div>
+        <div class="p-body" id="pBody">
+          <div style="color:#666;font-size:13px;">Wähle einen Marker auf der Karte.</div>
+        </div>
+      </div>
+    </div>
+
   </div>
 
-  <!-- остальной JS-код без изменений -->
+  <!-- Modal -->
+  <div class="modal-backdrop" id="modalBackdrop" role="dialog" aria-modal="true">
+    <div class="modal">
+      <div class="m-head">
+        <h3 id="modalTitle">Liste</h3>
+        <button id="modalClose" class="p-close" title="Schließen" aria-label="Schließen">×</button>
+      </div>
+      <div class="m-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <!-- Leaflet (CDN) -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+    // ======== Config ========
+    // Change this to your CSV URL (published Google Sheet CSV)
+    const CSV_URL = window.CSV_URL || "";
+    const DEFAULT_CENTER = [50.584, 8.679]; // roughly Gießen
+    const DEFAULT_ZOOM = 10;
+
+    // ======== State ========
+    let map, markersLayer;
+    let allRows = [];
+    let filteredRows = [];
+    let markerById = new Map();
+    let currentSelectedId = null;
+
+    // ======== Helpers ========
+    const $ = (sel) => document.querySelector(sel);
+
+    function setStatus(html){
+      $("#status").innerHTML = html;
+    }
+
+    function parseCSV(text){
+      // Robust-ish CSV parser (handles quoted fields)
+      const rows = [];
+      let i = 0, field = "", row = [], inQuotes = false;
+
+      while (i < text.length){
+        const c = text[i];
+
+        if (c === '"'){
+          if (inQuotes && text[i+1] === '"'){
+            field += '"';
+            i += 2;
+            continue;
+          }
+          inQuotes = !inQuotes;
+          i++;
+          continue;
+        }
+
+        if (!inQuotes && (c === "," || c === "\n" || c === "\r")){
+          if (c === ","){
+            row.push(field);
+            field = "";
+            i++;
+            continue;
+          }
+
+          // line break
+          if (c === "\r" && text[i+1] === "\n") i++;
+          row.push(field);
+          field = "";
+          if (row.length > 1 || row[0] !== "") rows.push(row);
+          row = [];
+          i++;
+          continue;
+        }
+
+        field += c;
+        i++;
+      }
+
+      // last field
+      row.push(field);
+      if (row.length > 1 || row[0] !== "") rows.push(row);
+
+      return rows;
+    }
+
+    function normalizeHeader(h){
+      return (h || "").trim();
+    }
+
+    function toNumber(v){
+      const n = parseFloat(String(v).replace(",", "."));
+      return Number.isFinite(n) ? n : null;
+    }
+
+    function escapeHtml(str){
+      return String(str ?? "")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;")
+        .replaceAll('"',"&quot;")
+        .replaceAll("'","&#039;");
+    }
+
+    function pick(obj, keys){
+      for (const k of keys){
+        if (obj[k] != null && String(obj[k]).trim() !== "") return obj[k];
+      }
+      return "";
+    }
+
+    function buildDetailsHTML(item){
+      const entries = [];
+      for (const [k,v] of Object.entries(item)){
+        if (v == null || String(v).trim() === "") continue;
+        entries.push(`<div><b>${escapeHtml(k)}:</b> ${escapeHtml(v)}</div>`);
+      }
+      if (!entries.length) return `<div style="color:#666;">Keine Details</div>`;
+      return `<div class="p-details">${entries.join("")}</div>`;
+    }
+
+    function buildActionsHTML(item){
+      const lat = toNumber(pick(item, ["lat","Lat","LAT","latitude","Latitude","Breitengrad"]));
+      const lon = toNumber(pick(item, ["lon","Lon","LON","lng","Lng","longitude","Longitude","Längengrad","Laengengrad"]));
+      const address = pick(item, ["Adresse","address","Address","Standort","Ort","Street","Straße","Strasse"]);
+      const id = pick(item, ["ID","Id","id","Nr","Nr.","Nummer"]);
+      const label = address || id || "Standort";
+
+      const actions = [];
+      if (lat != null && lon != null){
+        const gmaps = `https://www.google.com/maps?q=${lat},${lon}`;
+        actions.push(`<a class="primary" target="_blank" rel="noopener" href="${gmaps}">Google Maps</a>`);
+      }
+      return actions.length ? `<div class="p-actions">${actions.join("")}</div>` : "";
+    }
+
+    function renderPanel(item){
+      const id = pick(item, ["ID","Id","id","Nr","Nr.","Nummer"]) || "—";
+      const address = pick(item, ["Adresse","address","Address","Standort","Ort","Street","Straße","Strasse"]) || "—";
+      $("#pTitle").textContent = `ID: ${id}`;
+      $("#pAddr").textContent = address;
+
+      const photo = pick(item, ["Foto","foto","photo","Photo","Bild","image","Image","URL","Url","url"]);
+      const photoHtml = photo ? `<div class="p-photo"><img alt="Foto" src="${escapeHtml(photo)}" /></div>` : "";
+
+      $("#pBody").innerHTML = photoHtml + buildDetailsHTML(item) + buildActionsHTML(item);
+    }
+
+    function clearPanel(){
+      $("#pTitle").textContent = "Details";
+      $("#pAddr").textContent = "Bitte Marker wählen …";
+      $("#pBody").innerHTML = `<div style="color:#666;font-size:13px;">Wähle einen Marker auf der Karte.</div>`;
+      currentSelectedId = null;
+    }
+
+    function initMap(){
+      map = L.map("map", { zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+      }).addTo(map);
+
+      markersLayer = L.layerGroup().addTo(map);
+    }
+
+    function addMarkers(rows){
+      markersLayer.clearLayers();
+      markerById.clear();
+
+      for (const item of rows){
+        const lat = toNumber(pick(item, ["lat","Lat","LAT","latitude","Latitude","Breitengrad"]));
+        const lon = toNumber(pick(item, ["lon","Lon","LON","lng","Lng","longitude","Longitude","Längengrad","Laengengrad"]));
+        if (lat == null || lon == null) continue;
+
+        const id = pick(item, ["ID","Id","id","Nr","Nr.","Nummer"]) || `${lat},${lon}`;
+        const title = pick(item, ["Titel","title","Title","Bezeichnung","Name"]) || id;
+
+        const marker = L.marker([lat, lon], { title });
+        marker.on("click", () => {
+          currentSelectedId = id;
+          renderPanel(item);
+        });
+        marker.addTo(markersLayer);
+        markerById.set(id, marker);
+      }
+
+      $("#countPill").textContent = String(rows.length);
+    }
+
+    function setCityOptions(rows){
+      const cityKeyCandidates = ["Ort","ort","Stadt","stadt","City","city","Gemeinde","gemeinde"];
+      let cityKey = null;
+
+      if (rows.length){
+        for (const k of cityKeyCandidates){
+          if (k in rows[0]) { cityKey = k; break; }
+        }
+      }
+
+      const select = $("#citySelect");
+      const current = select.value;
+
+      // reset
+      select.innerHTML = `<option value="">Alle Orte</option>`;
+
+      if (!cityKey) return;
+
+      const set = new Set();
+      for (const r of rows){
+        const v = String(r[cityKey] ?? "").trim();
+        if (v) set.add(v);
+      }
+      const list = [...set].sort((a,b)=>a.localeCompare(b,"de"));
+
+      for (const c of list){
+        const opt = document.createElement("option");
+        opt.value = c;
+        opt.textContent = c;
+        select.appendChild(opt);
+      }
+
+      // keep selection if possible
+      if (current) select.value = current;
+    }
+
+    function applyFilters(){
+      const q = ($("#search").value || "").trim().toLowerCase();
+      const city = ($("#citySelect").value || "").trim();
+
+      filteredRows = allRows.filter(item => {
+        let ok = true;
+
+        if (city){
+          const v = pick(item, ["Ort","ort","Stadt","stadt","City","city","Gemeinde","gemeinde"]);
+          ok = ok && String(v || "").trim() === city;
+        }
+
+        if (q){
+          const blob = Object.values(item).map(v => String(v ?? "")).join(" ").toLowerCase();
+          ok = ok && blob.includes(q);
+        }
+
+        return ok;
+      });
+
+      addMarkers(filteredRows);
+
+      // If selected marker no longer in filter -> clear
+      if (currentSelectedId && !filteredRows.some(r => (pick(r, ["ID","Id","id","Nr","Nr.","Nummer"]) || "") === currentSelectedId)){
+        clearPanel();
+      }
+    }
+
+    function openModal(title, html){
+      $("#modalTitle").textContent = title;
+      $("#modalBody").innerHTML = html;
+      $("#modalBackdrop").style.display = "flex";
+    }
+    function closeModal(){
+      $("#modalBackdrop").style.display = "none";
+      $("#modalBody").innerHTML = "";
+    }
+
+    function buildListTable(rows){
+      if (!rows.length) return `<div style="color:#666;">Keine Einträge</div>`;
+      const cols = Object.keys(rows[0]);
+      const head = cols.map(c => `<th>${escapeHtml(c)}</th>`).join("");
+      const body = rows.map(r => {
+        const tds = cols.map(c => `<td>${escapeHtml(r[c])}</td>`).join("");
+        return `<tr>${tds}</tr>`;
+      }).join("");
+      return `<div style="max-height:70vh;overflow:auto;border:1px solid #eee;border-radius:12px;">
+        <table>
+          <thead><tr>${head}</tr></thead>
+          <tbody>${body}</tbody>
+        </table>
+      </div>`;
+    }
+
+    async function loadData(){
+      try{
+        if (!CSV_URL){
+          setStatus(`<b>Fehler:</b> CSV_URL ist leer. Bitte setze CSV_URL (Google Sheet CSV Link).`);
+          return;
+        }
+        setStatus(`<span class="loader"></span> Lädt Daten …`);
+
+        const res = await fetch(CSV_URL, { cache: "no-store" });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const csv = await res.text();
+
+        const raw = parseCSV(csv);
+        if (!raw.length) throw new Error("CSV leer");
+
+        const headers = raw[0].map(normalizeHeader);
+        const dataRows = raw.slice(1);
+
+        allRows = dataRows.map(arr => {
+          const obj = {};
+          for (let i=0; i<headers.length; i++){
+            const key = headers[i] || `col_${i+1}`;
+            obj[key] = arr[i] ?? "";
+          }
+          return obj;
+        });
+
+        setCityOptions(allRows);
+        filteredRows = allRows.slice();
+        addMarkers(filteredRows);
+
+        setStatus(`Geladen: <b>${allRows.length}</b> Einträge`);
+
+      }catch(err){
+        console.error(err);
+        setStatus(`<b>Fehler beim Laden:</b> ${escapeHtml(err.message || String(err))}`);
+      }
+    }
+
+    function wireUI(){
+      $("#search").addEventListener("input", () => applyFilters());
+      $("#citySelect").addEventListener("change", () => applyFilters());
+
+      $("#btnReset").addEventListener("click", () => {
+        $("#search").value = "";
+        $("#citySelect").value = "";
+        applyFilters();
+        map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+        clearPanel();
+      });
+
+      $("#btnList").addEventListener("click", () => {
+        openModal(`Liste (${filteredRows.length})`, buildListTable(filteredRows));
+      });
+
+      $("#modalBackdrop").addEventListener("click", (e) => {
+        if (e.target === $("#modalBackdrop")) closeModal();
+      });
+      $("#modalClose").addEventListener("click", closeModal);
+
+      $("#pClose").addEventListener("click", clearPanel);
+    }
+
+    // ======== Boot ========
+    initMap();
+    wireUI();
+    loadData();
+  </script>
 </body>
 </html>
