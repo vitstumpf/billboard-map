@@ -135,6 +135,10 @@
 
       overflow: hidden;    /* keep inside map */
       touch-action: pan-y; /* allow vertical scroll on mobile */
+
+      /* >>> ADDED (only): make panel layout fixed so inner scroll works <<< */
+      display: none;
+      flex-direction: column;
     }
 
     /* panel header */
@@ -164,36 +168,27 @@
     }
     .p-close:hover{ color:#000; }
 
-    .p-body {
+    .p-body{
       padding: 10px 14px 14px;
-      max-height: calc(100% - 60px); /* Немного уменьшил, чтобы не вылетало */
-      overflow-y: auto;             /* Разрешаем вертикальную прокрутку */
+      overflow: auto;
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
 
-      /* УДАЛИТЕ ИЛИ ЗАКОММЕНТИРУЙТЕ ЭТО:
-      scrollbar-width: none; 
-      */
-    }
+      /* >>> ADDED (only): force inner scrolling inside the panel <<< */
+      flex: 1 1 auto;
+      min-height: 0;
 
-    /* Настройка внешнего вида скроллбара (как на скриншоте) */
-    .p-body::-webkit-scrollbar {
-      width: 8px; /* Ширина полосы */
+      /* Desktop: show a small scrollbar INSIDE the panel */
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0,0,0,.35) transparent;
     }
-
-    .p-body::-webkit-scrollbar-track {
-      background: #f1f1f1; /* Цвет дорожки */
+    .p-body::-webkit-scrollbar{ width: 8px; height: 8px; }
+    .p-body::-webkit-scrollbar-track{ background: transparent; }
+    .p-body::-webkit-scrollbar-thumb{
+      background: rgba(0,0,0,.35);
       border-radius: 10px;
     }
-
-    .p-body::-webkit-scrollbar-thumb {
-      background: #888; /* Цвет самого ползунка */
-      border-radius: 10px;
-    }
-
-    .p-body::-webkit-scrollbar-thumb:hover {
-      background: #555; /* Цвет при наведении */
-    }
+    .p-body::-webkit-scrollbar-thumb:hover{ background: rgba(0,0,0,.5); }
 
     .p-addr{ font-size: 13px; margin: 6px 0 10px; color:#333; }
     .p-details{ font-size: 13px; line-height: 1.5; }
@@ -279,6 +274,10 @@
         max-height: 240px;
         object-fit: cover;
       }
+
+      /* Mobile: hide scrollbar visually (still scrollable) */
+      .p-body{ scrollbar-width: none; }
+      .p-body::-webkit-scrollbar{ width: 0; height: 0; }
     }
 
     /* Toast */
@@ -310,8 +309,8 @@
         <button class="btn" id="btnClearTop" type="button" disabled>Auswahl zurücksetzen</button>
       </div>
       <div class="muted">
-        Nach Klick auf „Angebot anfordern" wird der Text mit den ausgewählten Werbeflächen in die Zwischenablage kopiert.
-        Bitte fügen Sie ihn im Kontaktformular manuell in das Feld „Ihre Nachricht" ein (Strg + V) und füllen Sie alle weiteren Pflichtfelder vollständig aus.
+        Nach Klick auf „Angebot anfordern“ wird der Text mit den ausgewählten Werbeflächen in die Zwischenablage kopiert.
+        Bitte fügen Sie ihn im Kontaktformular manuell in das Feld „Ihre Nachricht“ ein (Strg + V) und füllen Sie alle weiteren Pflichtfelder vollständig aus.
       </div>
     </div>
 
@@ -509,7 +508,7 @@
 
       const msg = buildMessage();
       await copyToClipboard(msg);
-      toast("Text wurde kopiert. Bitte im Kontaktformular in das Feld „Ihre Nachricht" einfügen (Strg+V) und Pflichtfelder ausfüllen.", 9000);
+      toast("Text wurde kopiert. Bitte im Kontaktformular in das Feld „Ihre Nachricht“ einfügen (Strg+V) und Pflichtfelder ausfüllen.", 9000);
       openFormOnly();
     });
 
@@ -772,4 +771,55 @@
           const row = normalizeRow(raw);
           const lat = toNum(row.lat);
           const lon = toNum(row.lon);
-          if (!Number.isFinite(lat) || !Number.isFinite(lon))
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+
+          const marker = L.marker([lat, lon]);
+          marker.__row = row;
+
+          marker.on("click", () => {
+            openPanel(row);
+          });
+
+          clusters.addLayer(marker);
+          added++;
+        }
+
+        hideLoading();
+        setStatus("Werbeflächen: " + added);
+        hintEl.style.display = added ? "none" : "block";
+        if (added > 0) map.fitBounds(clusters.getBounds().pad(0.15));
+
+        renderSelectionUI();
+      };
+
+      const cached = getCachedRows();
+      if (cached) { renderRows(cached); return; }
+
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: (r) => {
+          const rows = r.data || [];
+          setCachedRows(rows);
+          renderRows(rows);
+        },
+        error: () => {
+          hideLoading();
+          setStatus("Fehler: Daten konnten nicht geladen werden.");
+          hintEl.style.display = "block";
+        }
+      });
+    }
+
+    renderSelectionUI();
+    init().catch(err => {
+      hideLoading();
+      setStatus("Fehler: " + err.message);
+      hintEl.style.display = "block";
+      console.error(err);
+    });
+  })();
+  </script>
+</body>
+</html>
