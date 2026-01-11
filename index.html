@@ -175,6 +175,26 @@
       scrollbar-width: none;
     }
     .p-body::-webkit-scrollbar{ width: 0; height: 0; }
+/* Desktop: show a small visible scrollbar in the panel body */
+@media (min-width: 641px){
+  .p-body{
+    scrollbar-width: thin;                 /* Firefox */
+    scrollbar-color: rgba(0,0,0,.35) transparent;
+  }
+  .p-body::-webkit-scrollbar{
+    width: 8px;                            /* Chrome/Edge/Safari */
+  }
+  .p-body::-webkit-scrollbar-track{
+    background: transparent;
+  }
+  .p-body::-webkit-scrollbar-thumb{
+    background: rgba(0,0,0,.35);
+    border-radius: 10px;
+  }
+  .p-body::-webkit-scrollbar-thumb:hover{
+    background: rgba(0,0,0,.5);
+  }
+}
 
     .p-addr{ font-size: 13px; margin: 6px 0 10px; color:#333; }
     .p-details{ font-size: 13px; line-height: 1.5; }
