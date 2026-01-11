@@ -295,6 +295,28 @@
       display: none;
       max-width: 92vw;
     }
+    /* === FIX: Scroll INSIDE info panel (Desktop only) === */
+@media (min-width: 641px){
+  #panel{
+    display: none;            /* JS will switch to flex */
+    flex-direction: column;  /* header top, body scrolls */
+  }
+
+  .p-body{
+    flex: 1 1 auto;           /* take remaining height */
+    min-height: 0;            /* IMPORTANT for scrolling */
+    overflow-y: auto;         /* force vertical scroll */
+  }
+
+  .p-body::-webkit-scrollbar{
+    width: 8px;
+  }
+  .p-body::-webkit-scrollbar-thumb{
+    background: rgba(0,0,0,.35);
+    border-radius: 10px;
+  }
+}
+
   </style>
 </head>
 
@@ -647,7 +669,7 @@
         </div>
       `;
 
-      panelEl.style.display = "block";
+      panelEl.style.display = "flex";
 
       // Leaflet helpers if present
       try {
