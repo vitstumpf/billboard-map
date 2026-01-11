@@ -25,7 +25,7 @@
     /* Top toolbar */
     .toolbar{
       display:flex;
-      align-items:center;
+      align-items:flex-start;
       justify-content: space-between;
       gap: 10px;
       margin: 10px 0 12px;
@@ -45,6 +45,7 @@
       background:#fff;
       border-radius: 999px;
       color:#222;
+      white-space: nowrap;
     }
     .btn{
       display:inline-block;
@@ -56,6 +57,7 @@
       border: 1px solid #ddd;
       background:#fff;
       cursor:pointer;
+      white-space: nowrap;
     }
     .btn:hover{ background:#f5f5f5; }
     .btn.primary{
@@ -73,7 +75,7 @@
       cursor:not-allowed;
     }
 
-    /* MAP: higher, closer to full-screen */
+    /* MAP: higher, close to full screen */
     #map{
       width: 100%;
       height: clamp(560px, 78vh, 920px);
@@ -108,51 +110,99 @@
     }
     #loading .txt{ font-size: 14px; color: #666; }
 
-    /* Popup */
-    .bb-popup{
-      width: 360px;
-      max-width: 360px;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-    }
-    .bb-title{ font-weight: 800; font-size: 16px; margin-bottom: 6px; color: #222; }
-    .bb-addr{ font-size: 13px; margin-bottom: 8px; color:#333; }
-    .bb-details{ font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
-    .bb-details div{ margin: 4px 0; }
+    .muted{ color:#666; font-size: 12px; }
 
-    .bb-photo{ margin: 10px 0; }
-    .bb-photo img{
-      width: 100%;
-      max-width: 100%;
-      height: auto;
-      display: block;
-      background: #fafafa;
-      border-radius: 10px;
+    /* ===== Details Panel (NOT Leaflet popup) ===== */
+    #panel{
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: calc(100% - 24px);  /* never wider than map */
+      max-width: 760px;          /* compact like Crossvertise */
+      background: rgba(255,255,255,.98);
+      border: 1px solid #e6e6e6;
+      box-shadow: 0 8px 26px rgba(0,0,0,.16);
+      border-radius: 14px;
+      z-index: 800; /* above leaflet controls */
+      display: none;
+      pointer-events: auto;
     }
-    .bb-nophoto{
+
+    /* panel header */
+    .p-head{
+      display:flex;
+      align-items:flex-start;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 12px 14px 8px;
+      border-bottom: 1px solid #eee;
+    }
+    .p-title{
+      font-weight: 900;
+      font-size: 16px;
+      line-height: 1.2;
+      color:#222;
+    }
+    .p-close{
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      font-size: 20px;
+      line-height: 1;
+      padding: 0 4px;
+      color:#444;
+    }
+    .p-close:hover{ color:#000; }
+
+    .p-body{
+      padding: 10px 14px 14px;
+      max-height: calc(100% - 52px);
+      overflow: auto;
+      -webkit-overflow-scrolling: touch;
+
+      /* hide scrollbar visually */
+      scrollbar-width: none;
+    }
+    .p-body::-webkit-scrollbar{ width: 0; height: 0; }
+
+    .p-addr{ font-size: 13px; margin: 6px 0 10px; color:#333; }
+    .p-details{ font-size: 13px; line-height: 1.5; }
+    .p-details div{ margin: 4px 0; }
+
+    .p-photo{ margin: 10px 0 8px; }
+    .p-photo img{
+      width: 100%;
+      height: auto;
+      display:block;
+      border-radius: 12px;
+      background:#fafafa;
+    }
+    .p-nophoto{
       margin: 10px 0;
       font-size: 12px;
       opacity: .75;
       font-style: italic;
     }
 
-    .bb-notes{
+    .p-notes{
       font-size: 12px;
-      margin: 8px 0;
-      opacity: .9;
-      padding: 8px;
+      margin: 10px 0 0;
+      opacity: .92;
+      padding: 10px;
       background: #f5f5f5;
-      border-radius: 6px;
+      border-radius: 10px;
     }
 
-    /* Favorite row in popup */
-    .bb-fav-row{
+    /* Favorite row */
+    .p-fav-row{
       display:flex;
       align-items:center;
       gap:10px;
-      margin: 6px 0 2px;
+      margin: 8px 0 0;
       user-select:none;
     }
-    .bb-fav-btn{
+    .p-fav-btn{
       display:inline-flex;
       align-items:center;
       gap:8px;
@@ -162,8 +212,8 @@
       cursor: pointer;
       font: inherit;
     }
-    .bb-fav-label{
-      font-weight: 700;
+    .p-fav-label{
+      font-weight: 800;
       font-size: 13px;
       color: #222;
     }
@@ -173,24 +223,27 @@
       display:block;
     }
     .bb-star path{
-      stroke: #c4a400; /* gold */
+      stroke: #c4a400;
       stroke-width: 2;
       fill: transparent;
     }
-    .bb-fav-on .bb-star path{
-      fill: #ffd400; /* yellow filled */
-    }
+    .is-on .bb-star path{ fill: #ffd400; }
 
-    .muted{ color:#666; font-size: 12px; }
-
-    /* Leaflet popup: compact with inner scroll */
-    .leaflet-popup-content{
-      margin: 12px 14px;
-      max-height: 340px;
-      overflow: auto;
-    }
-    .leaflet-popup-content-wrapper{
-      border-radius: 12px;
+    /* Mobile: keep panel fully inside the map */
+    @media (max-width: 640px){
+      #panel{
+        top: 10px;
+        width: calc(100% - 16px);
+        max-width: none;                 /* use map width */
+        border-radius: 14px;
+      }
+      .p-body{
+        max-height: calc(100% - 54px);   /* always within map */
+      }
+      .p-photo img{
+        max-height: 240px;
+        object-fit: cover;
+      }
     }
 
     /* Toast */
@@ -208,7 +261,6 @@
       display: none;
       max-width: 92vw;
     }
-    #toast a{ color:#fff; text-decoration: underline; }
   </style>
 </head>
 
@@ -228,7 +280,10 @@
       </div>
     </div>
 
-    <div id="map"></div>
+    <div id="map">
+      <!-- Details panel lives inside the page (not Leaflet popup) -->
+      <div id="panel" aria-live="polite"></div>
+    </div>
 
     <div class="muted" id="hint" style="margin-top:8px; display:none;">
       Hinweis: Falls keine Marker sichtbar sind, prüfen Sie bitte lat/lon und die Veröffentlichung der Tabelle.
@@ -259,10 +314,6 @@
     const CACHE_MINUTES = 15;   // 0 = disable cache
     const DEFAULT_CENTER = [51.0, 10.0];
     const DEFAULT_ZOOM = 6;
-
-    // padding to keep popup fully visible (adjust if needed)
-    const POPUP_PAD_TOPLEFT = [20, 160];
-    const POPUP_PAD_BOTTOMRIGHT = [20, 20];
     // ==========================
 
     const statusEl  = document.getElementById("status");
@@ -274,12 +325,14 @@
     const btnRequestTop = document.getElementById("btnRequestTop");
     const btnClearTop   = document.getElementById("btnClearTop");
 
+    const panelEl = document.getElementById("panel");
+
     const setStatus = (m) => { statusEl.textContent = m; };
     const showLoading = () => { loadingEl.style.display = "flex"; };
     const hideLoading = () => { loadingEl.style.display = "none"; };
 
-    function toast(msg, ms=5000){
-      toastEl.innerHTML = msg;
+    function toast(msg, ms=6500){
+      toastEl.textContent = msg;
       toastEl.style.display = "block";
       clearTimeout(toastEl.__t);
       toastEl.__t = setTimeout(()=>toastEl.style.display="none", ms);
@@ -318,6 +371,14 @@
       .replaceAll('"', "&quot;")
       .replaceAll("'", "&#39;");
 
+    function starSvg(){
+      return `
+        <svg class="bb-star" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+          <path d="M12 2.4l2.9 6.2 6.8.6-5.2 4.4 1.6 6.6-6.1-3.5-6.1 3.5 1.6-6.6-5.2-4.4 6.8-.6L12 2.4z"/>
+        </svg>
+      `;
+    }
+
     function buildGitHubPhotoCandidates(id){
       const base = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${PHOTOS_DIR}/${encodeURIComponent(id)}`;
       return [ base + ".jpg", base + ".jpeg", base + ".png", base + ".webp" ];
@@ -346,8 +407,7 @@
       renderSelectionUI();
     }
     function isSelected(id){
-      const ids = getSelectedIds();
-      return ids.includes(String(id).trim());
+      return getSelectedIds().includes(String(id).trim());
     }
     function toggleSelected(id){
       id = String(id || "").trim();
@@ -362,6 +422,10 @@
         ids.push(id);
         setSelectedIds(ids);
         toast("Ausgewählt.");
+      }
+      // refresh panel state if open
+      if (panelEl.style.display !== "none" && panelEl.__row && panelEl.__row.id === id) {
+        openPanel(panelEl.__row);
       }
     }
 
@@ -394,8 +458,7 @@
     }
 
     function renderSelectionUI(){
-      const ids = getSelectedIds();
-      const n = ids.length;
+      const n = getSelectedIds().length;
       selCountEl.textContent = `Ausgewählt: ${n}`;
       btnRequestTop.disabled = n === 0;
       btnClearTop.disabled = n === 0;
@@ -411,10 +474,8 @@
       if (!ids.length) return;
 
       const msg = buildMessage();
-
       await copyToClipboard(msg);
-      toast('Text wurde kopiert. Bitte im Kontaktformular in das Feld „Ihre Nachricht“ einfügen (Strg+V) und Pflichtfelder ausfüllen.', 7000);
-
+      toast("Text wurde kopiert. Bitte im Kontaktformular in das Feld „Ihre Nachricht“ einfügen (Strg+V) und Pflichtfelder ausfüllen.", 8000);
       openFormOnly();
     });
 
@@ -432,53 +493,114 @@
       return row;
     }
 
-    function starSvg(){
-      return `
-        <svg class="bb-star" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 2.4l2.9 6.2 6.8.6-5.2 4.4 1.6 6.6-6.1-3.5-6.1 3.5 1.6-6.6-5.2-4.4 6.8-.6L12 2.4z"/>
-        </svg>
-      `;
+    async function loadPhotoHtml(id){
+      if (!id) return `<div class="p-nophoto">Kein Foto verfügbar</div>`;
+
+      const extCache = getPhotoExtCache();
+      const cachedExt = extCache[id];
+
+      let candidates = buildGitHubPhotoCandidates(id);
+      if (cachedExt) {
+        const preferred = candidates.find(u => u.endsWith(cachedExt));
+        candidates = [preferred, ...candidates.filter(u => u !== preferred)].filter(Boolean);
+      }
+
+      const tryLoad = (url) => new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ ok:true, url });
+        img.onerror = () => resolve({ ok:false, url });
+        img.src = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now();
+      });
+
+      for (const url of candidates) {
+        const res = await tryLoad(url);
+        if (res.ok) {
+          const ext = url.slice(url.lastIndexOf("."));
+          extCache[id] = ext;
+          setPhotoExtCache(extCache);
+          return `<img src="${esc(url)}" alt="" loading="lazy">`;
+        }
+      }
+
+      return `<div class="p-nophoto">Kein Foto verfügbar</div>`;
     }
 
-    function popupHtml(row) {
-      const title  = esc(row.title || "");
+    function closePanel(){
+      panelEl.style.display = "none";
+      panelEl.innerHTML = "";
+      panelEl.__row = null;
+    }
+
+    async function openPanel(row){
+      if (!row || !row.id) return;
+      panelEl.__row = row;
+
+      const title  = esc(row.title || ("ID " + row.id));
       const addr   = esc(row.address || "");
       const format = esc(row.format || "");
       const price  = esc(row.price || "");
       const lw     = esc(row.leistungswert || "");
       const notes  = esc(row.notes || "");
 
-      const photoSlotId = "photo_" + esc(row.id || ("x" + Math.random().toString(16).slice(2)));
-      const favBtnId = "fav_" + esc(row.id || ("x" + Math.random().toString(16).slice(2)));
-      const favClass = isSelected(row.id) ? "bb-fav-btn bb-fav-on" : "bb-fav-btn";
+      const isOn = isSelected(row.id);
 
-      return `
-        <div class="bb-popup">
-          <div class="bb-title">${title || ("ID " + esc(row.id || "?"))}</div>
-          ${addr ? `<div class="bb-addr"><b>Adresse:</b> ${addr}</div>` : ""}
+      panelEl.innerHTML = `
+        <div class="p-head">
+          <div>
+            <div class="p-title">${title}</div>
+            ${addr ? `<div class="p-addr"><b>Adresse:</b> ${addr}</div>` : ""}
+          </div>
+          <button class="p-close" type="button" aria-label="Schließen">×</button>
+        </div>
 
-          <div class="bb-details">
+        <div class="p-body">
+          <div class="p-details">
             ${format ? `<div><b>Format:</b> ${format}</div>` : ""}
             ${price ? `<div><b>Preis:</b> ${price}</div>` : ""}
             ${lw ? `<div><b>Leistungswert:</b> ${lw}</div>` : ""}
-            ${row.id ? `<div style="opacity:.7"><b>ID:</b> ${esc(row.id)}</div>` : ""}
+            <div style="opacity:.75"><b>ID:</b> ${esc(row.id)}</div>
           </div>
 
-          <div class="bb-fav-row">
-            <button type="button" id="${favBtnId}" class="${favClass}" aria-label="Merken">
+          <div class="p-fav-row">
+            <button type="button" class="p-fav-btn ${isOn ? "is-on" : ""}" aria-label="Merken">
               ${starSvg()}
-              <span class="bb-fav-label">Merken</span>
+              <span class="p-fav-label">Merken</span>
             </button>
           </div>
 
-          <div class="bb-photo" id="${photoSlotId}">
-            <div class="bb-nophoto">Foto wird geladen…</div>
+          <div class="p-photo" id="panelPhoto">
+            <div class="p-nophoto">Foto wird geladen…</div>
           </div>
 
-          ${notes ? `<div class="bb-notes"><b>Hinweise:</b><br>${notes}</div>` : ""}
+          ${notes ? `<div class="p-notes"><b>Hinweise:</b><br>${notes}</div>` : ""}
         </div>
       `;
+      panelEl.style.display = "block";
+
+      // wire close
+      const closeBtn = panelEl.querySelector(".p-close");
+      if (closeBtn) closeBtn.onclick = closePanel;
+
+      // wire fav
+      const favBtn = panelEl.querySelector(".p-fav-btn");
+      if (favBtn) {
+        favBtn.onclick = () => toggleSelected(row.id);
+      }
+
+      // load photo
+      const photoWrap = panelEl.querySelector("#panelPhoto");
+      if (photoWrap) {
+        photoWrap.innerHTML = await loadPhotoHtml(row.id);
+      }
     }
+
+    // close panel when clicking outside it (inside map)
+    document.getElementById("map").addEventListener("click", (e) => {
+      if (panelEl.style.display === "none") return;
+      const inside = panelEl.contains(e.target);
+      // If user clicks on map (not on panel), close it
+      if (!inside) closePanel();
+    }, true);
 
     // Cache
     function getCachedRows() {
@@ -512,42 +634,6 @@
         map.setView([p.lat, p.lng], p.zoom);
         return true;
       } catch { return false; }
-    }
-
-    async function loadPhotoInto(slotEl, id){
-      if (!slotEl || !id) {
-        if (slotEl) slotEl.innerHTML = `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
-        return;
-      }
-
-      const extCache = getPhotoExtCache();
-      const cachedExt = extCache[id];
-
-      let candidates = buildGitHubPhotoCandidates(id);
-      if (cachedExt) {
-        const preferred = candidates.find(u => u.endsWith(cachedExt));
-        candidates = [preferred, ...candidates.filter(u => u !== preferred)].filter(Boolean);
-      }
-
-      const tryLoad = (url) => new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve({ ok:true, url });
-        img.onerror = () => resolve({ ok:false, url });
-        img.src = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now();
-      });
-
-      for (const url of candidates) {
-        const res = await tryLoad(url);
-        if (res.ok) {
-          const ext = url.slice(url.lastIndexOf("."));
-          extCache[id] = ext;
-          setPhotoExtCache(extCache);
-          slotEl.innerHTML = `<img src="${esc(url)}" alt="" loading="lazy">`;
-          return;
-        }
-      }
-
-      slotEl.innerHTML = `<div class="bb-nophoto">Kein Foto verfügbar</div>`;
     }
 
     async function init() {
@@ -584,35 +670,10 @@
       map.on("moveend", () => saveMapPos(map));
       restoreMapPos(map);
 
-      // On popup open: load photo + wire favorite button + ensure popup fully visible
-      map.on("popupopen", (e) => {
-        try {
-          const marker = e.popup && e.popup._source;
-          const row = marker && marker.__row;
-          if (!row || !row.id) return;
-
-          // ensure popup is fully visible
-          try{
-            map.panInside(marker.getLatLng(), {
-              paddingTopLeft: POPUP_PAD_TOPLEFT,
-              paddingBottomRight: POPUP_PAD_BOTTOMRIGHT
-            });
-          }catch{}
-
-          // photo
-          const slot = document.getElementById("photo_" + row.id);
-          if (slot) loadPhotoInto(slot, row.id);
-
-          // fav button
-          const favBtn = document.getElementById("fav_" + row.id);
-          if (favBtn) {
-            favBtn.onclick = () => {
-              toggleSelected(row.id);
-              if (isSelected(row.id)) favBtn.classList.add("bb-fav-on");
-              else favBtn.classList.remove("bb-fav-on");
-            };
-          }
-        } catch {}
+      // close panel when user starts moving the map (optional; feels natural)
+      map.on("movestart", () => {
+        // keep if you want; comment out if not desired
+        // closePanel();
       });
 
       const renderRows = (rows) => {
@@ -628,13 +689,9 @@
           const marker = L.marker([lat, lon]);
           marker.__row = row;
 
-          marker.bindPopup(popupHtml(row), {
-            maxWidth: 380,
-            autoPan: true,
-            keepInView: true,
-            closeButton: true,
-            autoPanPaddingTopLeft: POPUP_PAD_TOPLEFT,
-            autoPanPaddingBottomRight: POPUP_PAD_BOTTOMRIGHT
+          // Instead of Leaflet popup: open our page panel
+          marker.on("click", () => {
+            openPanel(row);
           });
 
           clusters.addLayer(marker);
