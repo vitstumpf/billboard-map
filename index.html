@@ -115,26 +115,18 @@
       top: 12px;
       left: 50%;
       transform: translateX(-50%);
-
-      /* Never wider than map */
-      width: calc(100% - 24px);
-
-      /* Desktop: ~1/3 smaller than before */
-      max-width: 460px;
-
-      /* NEVER exceed map height */
-      max-height: calc(100% - 24px);
-
+      width: calc(100% - 24px);  /* never wider than map */
+      max-width: 680px;          /* compact on desktop */
+      max-height: calc(100% - 24px); /* NEVER exceed map height */
       background: rgba(255,255,255,.98);
       border: 1px solid #e6e6e6;
       box-shadow: 0 8px 26px rgba(0,0,0,.16);
       border-radius: 14px;
-      z-index: 800;
+      z-index: 800; /* above leaflet controls */
       display: none;
       pointer-events: auto;
-
-      overflow: hidden;    /* keep inside map */
-      touch-action: pan-y; /* allow vertical scroll on mobile */
+      overflow: hidden;          /* keep inside map */
+      touch-action: pan-y;       /* allow vertical scroll on mobile */
     }
 
     /* panel header */
@@ -166,15 +158,16 @@
 
     .p-body{
       padding: 10px 14px 14px;
-      max-height: calc(100% - 54px);
+      max-height: calc(100% - 54px); /* header height */
       overflow: auto;
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
-
-      /* hide scrollbar visually (still scrollable) */
-      scrollbar-width: none;
+      /* Scrollbar sichtbar (Desktop + Mobile) */
+      scrollbar-width: auto;
     }
-    .p-body::-webkit-scrollbar{ width: 0; height: 0; }
+    .p-body::-webkit-scrollbar{ width: 10px; }
+    .p-body::-webkit-scrollbar-thumb{ background: rgba(0,0,0,.25); border-radius: 8px; }
+    .p-body::-webkit-scrollbar-track{ background: rgba(0,0,0,.06); }
 
     .p-addr{ font-size: 13px; margin: 6px 0 10px; color:#333; }
     .p-details{ font-size: 13px; line-height: 1.5; }
@@ -188,15 +181,6 @@
       border-radius: 12px;
       background:#fafafa;
     }
-
-    /* Desktop: reduce photo height so comments fit */
-    @media (min-width: 641px){
-      .p-photo img{
-        max-height: 280px;
-        object-fit: cover;
-      }
-    }
-
     .p-nophoto{
       margin: 10px 0;
       font-size: 12px;
@@ -297,6 +281,7 @@
     </div>
 
     <div id="map">
+      <!-- Details panel lives inside the page (not Leaflet popup) -->
       <div id="panel" aria-live="polite"></div>
     </div>
 
@@ -439,6 +424,7 @@
         setSelectedIds(ids);
         toast("Ausgewählt.", 2500);
       }
+      // refresh panel state if open
       if (panelEl.style.display !== "none" && panelEl.__row && panelEl.__row.id === id) {
         openPanel(panelEl.__row);
       }
@@ -503,21 +489,22 @@
       row.lon     = row.lon ?? "";
       row.price   = row.price ?? "";
       row.format  = row.format ?? "";
-      // IMPORTANT: support various column headers for comments/notes
+
+      // Notes/Kommentar: support multiple possible column headers
       row.notes = row.notes
         || row.note
-        || row.notes_text
+        || row.Notes
+        || row.NOTE
         || row.comment
         || row.Comment
         || row.kommentar
         || row.Kommentar
         || row["Kommentar"]
-        || row["kommentar"]
-        || row["Comment"]
-        || row["comment"]
         || row["Hinweise"]
-        || row["hinweise"]
+        || row["Note"]
+        || row["Notiz"]
         || "";
+
       row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
       return row;
     }
@@ -561,6 +548,7 @@
     }
 
     function lockMapUnderPanel(enable){
+      // Prevent map from panning/zooming when user scrolls/swipes on panel
       if (!window.__bb_map) return;
       const map = window.__bb_map;
       try {
@@ -625,13 +613,14 @@
             <div class="p-nophoto">Foto wird geladen…</div>
           </div>
 
-          ${notes ? `<div class="p-notes"><b>Hinweise / Kommentar:</b><br>${notes}</div>` : ""}
+          ${notes ? `<div class="p-notes"><b>Hinweise:</b><br>${notes}</div>` : ""}
         </div>
       `;
 
       panelEl.style.display = "block";
 
-      // Leaflet helpers if present
+      // --- Stop Leaflet from grabbing touch/wheel gestures on mobile ---
+      // 1) Leaflet helpers if present
       try {
         if (window.L && L.DomEvent) {
           L.DomEvent.disableClickPropagation(panelEl);
@@ -639,33 +628,45 @@
         }
       } catch {}
 
+      // 2) Explicit touch/wheel handling
       const pBody = panelEl.querySelector("#pBody");
       const stop = (ev) => { ev.stopPropagation(); };
+      const prevent = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
 
-      // Prevent map from reacting when user interacts with panel
+      // Allow scroll inside panel body, but prevent the map from panning under it
       panelEl.onpointerdown = () => lockMapUnderPanel(true);
       panelEl.onpointerup = () => lockMapUnderPanel(false);
       panelEl.onpointercancel = () => lockMapUnderPanel(false);
       panelEl.onpointerleave = () => lockMapUnderPanel(false);
 
+      // Stop map drag on touch moves over panel
       panelEl.addEventListener("touchstart", stop, { passive:true });
       panelEl.addEventListener("touchmove", stop, { passive:true });
       panelEl.addEventListener("wheel", stop, { passive:true });
 
+      // If user uses two-finger scroll / weird cases, keep map locked
       if (pBody) {
         pBody.addEventListener("touchstart", stop, { passive:true });
         pBody.addEventListener("touchmove", stop, { passive:true });
       }
 
+      // wire close
       const closeBtn = panelEl.querySelector(".p-close");
       if (closeBtn) closeBtn.onclick = () => { lockMapUnderPanel(false); closePanel(); };
 
+      // wire fav
       const favBtn = panelEl.querySelector(".p-fav-btn");
-      if (favBtn) favBtn.onclick = () => toggleSelected(row.id);
+      if (favBtn) {
+        favBtn.onclick = () => toggleSelected(row.id);
+      }
 
+      // load photo
       const photoWrap = panelEl.querySelector("#panelPhoto");
-      if (photoWrap) photoWrap.innerHTML = await loadPhotoHtml(row.id);
+      if (photoWrap) {
+        photoWrap.innerHTML = await loadPhotoHtml(row.id);
+      }
 
+      // ensure panel scroll starts at top
       if (pBody) pBody.scrollTop = 0;
     }
 
@@ -758,6 +759,7 @@
           const marker = L.marker([lat, lon]);
           marker.__row = row;
 
+          // Instead of Leaflet popup: open our page panel
           marker.on("click", () => {
             openPanel(row);
           });
@@ -774,6 +776,7 @@
         renderSelectionUI();
       };
 
+      // Cache first
       const cached = getCachedRows();
       if (cached) { renderRows(cached); return; }
 
@@ -794,6 +797,7 @@
       });
     }
 
+    // Init
     renderSelectionUI();
     init().catch(err => {
       hideLoading();
