@@ -73,10 +73,10 @@
       cursor:not-allowed;
     }
 
+    /* MAP: higher, closer to full-screen */
     #map{
       width: 100%;
-      height: calc(100vh - 210px);
-      min-height: 420px;
+      height: clamp(560px, 78vh, 920px);
       border-radius: 12px;
       overflow: hidden;
       background: #f3f3f3;
@@ -109,7 +109,11 @@
     #loading .txt{ font-size: 14px; color: #666; }
 
     /* Popup */
-    .bb-popup{ min-width: 240px; max-width: 420px; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    .bb-popup{
+      width: 360px;
+      max-width: 360px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
     .bb-title{ font-weight: 800; font-size: 16px; margin-bottom: 6px; color: #222; }
     .bb-addr{ font-size: 13px; margin-bottom: 8px; color:#333; }
     .bb-details{ font-size: 13px; line-height: 1.5; margin-bottom: 10px; }
@@ -118,7 +122,7 @@
     .bb-photo{ margin: 10px 0; }
     .bb-photo img{
       width: 100%;
-      max-width: 380px;
+      max-width: 100%;
       height: auto;
       display: block;
       background: #fafafa;
@@ -179,6 +183,16 @@
 
     .muted{ color:#666; font-size: 12px; }
 
+    /* Leaflet popup: compact with inner scroll */
+    .leaflet-popup-content{
+      margin: 12px 14px;
+      max-height: 340px;
+      overflow: auto;
+    }
+    .leaflet-popup-content-wrapper{
+      border-radius: 12px;
+    }
+
     /* Toast */
     #toast{
       position: fixed;
@@ -210,8 +224,7 @@
       </div>
       <div class="muted">
         Nach Klick auf „Angebot anfordern“ wird der Text mit den ausgewählten Werbeflächen in die Zwischenablage kopiert.
-Bitte fügen Sie ihn im Kontaktformular manuell in das Feld „Ihre Nachricht“ ein (Strg + V)
-und füllen Sie alle weiteren Pflichtfelder vollständig aus.
+        Bitte fügen Sie ihn im Kontaktformular manuell in das Feld „Ihre Nachricht“ ein (Strg + V) und füllen Sie alle weiteren Pflichtfelder vollständig aus.
       </div>
     </div>
 
@@ -237,9 +250,6 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
     const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
     const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
 
-    // Pipedrive field key (query param name) where we prefill selected IDs
-    const PREFILL_FIELD_PARAM = "V2ViRm9ybUNhcHR1cmVCbG9jazoxNzBjMzU3MC0zZWRlLTExZWItYTEyNy1iMThlYzEzNTdiNTA";
-
     // GitHub repo info (photos/<id>.<ext>)
     const GITHUB_USER = "vitstumpf";
     const GITHUB_REPO = "billboard-map";
@@ -249,6 +259,10 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
     const CACHE_MINUTES = 15;   // 0 = disable cache
     const DEFAULT_CENTER = [51.0, 10.0];
     const DEFAULT_ZOOM = 6;
+
+    // padding to keep popup fully visible (adjust if needed)
+    const POPUP_PAD_TOPLEFT = [20, 160];
+    const POPUP_PAD_BOTTOMRIGHT = [20, 20];
     // ==========================
 
     const statusEl  = document.getElementById("status");
@@ -264,7 +278,7 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
     const showLoading = () => { loadingEl.style.display = "flex"; };
     const hideLoading = () => { loadingEl.style.display = "none"; };
 
-    function toast(msg, ms=3500){
+    function toast(msg, ms=5000){
       toastEl.innerHTML = msg;
       toastEl.style.display = "block";
       clearTimeout(toastEl.__t);
@@ -323,7 +337,6 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
         const raw = localStorage.getItem(FAV_KEY);
         const arr = raw ? JSON.parse(raw) : [];
         const ids = Array.isArray(arr) ? arr.map(x => String(x).trim()).filter(Boolean) : [];
-        // unique
         return Array.from(new Set(ids));
       } catch { return []; }
     }
@@ -352,13 +365,12 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
       }
     }
 
-    function buildIdsValue(){
-      // what we pass to Pipedrive field: ONLY IDs, one per line
-     const ids = getSelectedIds();
-  const header = "Guten Tag, bitte kontaktieren Sie mich bezüglich der folgenden Werbeflächen:";
-  const lines = ids.map(id => `[${id}]`);
-  return `${header}\n${lines.join("\n")}`;
-}
+    function buildMessage(){
+      const ids = getSelectedIds();
+      const header = "Guten Tag, bitte kontaktieren Sie mich bezüglich der folgenden Werbeflächen:";
+      const lines = ids.map(id => `[${id}]`);
+      return `${header}\n${lines.join("\n")}`;
+    }
 
     async function copyToClipboard(text){
       try {
@@ -377,10 +389,8 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
       }
     }
 
-    function openFormWithPrefill(value){
-      const u = new URL(FORM_URL);
-      u.searchParams.set(PREFILL_FIELD_PARAM, value);
-      window.open(u.toString(), "_blank", "noopener");
+    function openFormOnly(){
+      window.open(FORM_URL, "_blank", "noopener");
     }
 
     function renderSelectionUI(){
@@ -400,14 +410,12 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
       const ids = getSelectedIds();
       if (!ids.length) return;
 
-      const value = buildIdsValue();
+      const msg = buildMessage();
 
-      // clipboard (extra safety / convenience)
-      await copyToClipboard(value);
-      toast("IDs wurden kopiert und an die Form übergeben.");
+      await copyToClipboard(msg);
+      toast('Text wurde kopiert. Bitte im Kontaktformular in das Feld „Ihre Nachricht“ einfügen (Strg+V) und Pflichtfelder ausfüllen.', 7000);
 
-      // open prefilled form
-      openFormWithPrefill(value);
+      openFormOnly();
     });
 
     function normalizeRow(row) {
@@ -576,12 +584,20 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
       map.on("moveend", () => saveMapPos(map));
       restoreMapPos(map);
 
-      // On popup open: load photo + wire favorite button
+      // On popup open: load photo + wire favorite button + ensure popup fully visible
       map.on("popupopen", (e) => {
         try {
           const marker = e.popup && e.popup._source;
           const row = marker && marker.__row;
           if (!row || !row.id) return;
+
+          // ensure popup is fully visible
+          try{
+            map.panInside(marker.getLatLng(), {
+              paddingTopLeft: POPUP_PAD_TOPLEFT,
+              paddingBottomRight: POPUP_PAD_BOTTOMRIGHT
+            });
+          }catch{}
 
           // photo
           const slot = document.getElementById("photo_" + row.id);
@@ -592,7 +608,6 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
           if (favBtn) {
             favBtn.onclick = () => {
               toggleSelected(row.id);
-              // update visual state
               if (isSelected(row.id)) favBtn.classList.add("bb-fav-on");
               else favBtn.classList.remove("bb-fav-on");
             };
@@ -612,7 +627,16 @@ und füllen Sie alle weiteren Pflichtfelder vollständig aus.
 
           const marker = L.marker([lat, lon]);
           marker.__row = row;
-          marker.bindPopup(popupHtml(row), { maxWidth: 460 });
+
+          marker.bindPopup(popupHtml(row), {
+            maxWidth: 380,
+            autoPan: true,
+            keepInView: true,
+            closeButton: true,
+            autoPanPaddingTopLeft: POPUP_PAD_TOPLEFT,
+            autoPanPaddingBottomRight: POPUP_PAD_BOTTOMRIGHT
+          });
+
           clusters.addLayer(marker);
           added++;
         }
