@@ -70,10 +70,7 @@
       border-color:#084c8d;
       color:#fff;
     }
-    .btn:disabled{
-      opacity:.5;
-      cursor:not-allowed;
-    }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
 
     /* MAP: higher, close to full screen */
     #map{
@@ -119,7 +116,8 @@
       left: 50%;
       transform: translateX(-50%);
       width: calc(100% - 24px);  /* never wider than map */
-      max-width: 760px;          /* compact like Crossvertise */
+      max-width: 680px;          /* compact on desktop */
+      max-height: calc(100% - 24px); /* NEVER exceed map height */
       background: rgba(255,255,255,.98);
       border: 1px solid #e6e6e6;
       box-shadow: 0 8px 26px rgba(0,0,0,.16);
@@ -127,6 +125,8 @@
       z-index: 800; /* above leaflet controls */
       display: none;
       pointer-events: auto;
+      overflow: hidden;          /* keep inside map */
+      touch-action: pan-y;       /* allow vertical scroll on mobile */
     }
 
     /* panel header */
@@ -137,6 +137,7 @@
       gap: 10px;
       padding: 12px 14px 8px;
       border-bottom: 1px solid #eee;
+      background: rgba(255,255,255,.98);
     }
     .p-title{
       font-weight: 900;
@@ -157,9 +158,10 @@
 
     .p-body{
       padding: 10px 14px 14px;
-      max-height: calc(100% - 52px);
+      max-height: calc(100% - 54px); /* header height */
       overflow: auto;
       -webkit-overflow-scrolling: touch;
+      touch-action: pan-y;
 
       /* hide scrollbar visually */
       scrollbar-width: none;
@@ -234,11 +236,8 @@
       #panel{
         top: 10px;
         width: calc(100% - 16px);
-        max-width: none;                 /* use map width */
+        max-width: none;
         border-radius: 14px;
-      }
-      .p-body{
-        max-height: calc(100% - 54px);   /* always within map */
       }
       .p-photo img{
         max-height: 240px;
@@ -303,7 +302,7 @@
   (function () {
     // ========= CONFIG =========
     const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
-    const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
+    const FORM_URL = "https://webforms.pipedrive.com/f/1rqc7SFMmd0tMGqY1NFzq1ZRpMihVWgWVsaSEYjMKRtYf2zpk9zjTHRUnYp7nYPvR";
 
     // GitHub repo info (photos/<id>.<ext>)
     const GITHUB_USER = "vitstumpf";
@@ -325,13 +324,14 @@
     const btnRequestTop = document.getElementById("btnRequestTop");
     const btnClearTop   = document.getElementById("btnClearTop");
 
+    const mapEl = document.getElementById("map");
     const panelEl = document.getElementById("panel");
 
     const setStatus = (m) => { statusEl.textContent = m; };
     const showLoading = () => { loadingEl.style.display = "flex"; };
     const hideLoading = () => { loadingEl.style.display = "none"; };
 
-    function toast(msg, ms=6500){
+    function toast(msg, ms=8000){
       toastEl.textContent = msg;
       toastEl.style.display = "block";
       clearTimeout(toastEl.__t);
@@ -417,11 +417,11 @@
       if (idx >= 0) {
         ids.splice(idx, 1);
         setSelectedIds(ids);
-        toast("Auswahl entfernt.");
+        toast("Auswahl entfernt.", 2500);
       } else {
         ids.push(id);
         setSelectedIds(ids);
-        toast("Ausgewählt.");
+        toast("Ausgewählt.", 2500);
       }
       // refresh panel state if open
       if (panelEl.style.display !== "none" && panelEl.__row && panelEl.__row.id === id) {
@@ -466,7 +466,7 @@
 
     btnClearTop.addEventListener("click", () => {
       setSelectedIds([]);
-      toast("Auswahl wurde zurückgesetzt.");
+      toast("Auswahl wurde zurückgesetzt.", 3000);
     });
 
     btnRequestTop.addEventListener("click", async () => {
@@ -475,7 +475,7 @@
 
       const msg = buildMessage();
       await copyToClipboard(msg);
-      toast("Text wurde kopiert. Bitte im Kontaktformular in das Feld „Ihre Nachricht“ einfügen (Strg+V) und Pflichtfelder ausfüllen.", 8000);
+      toast("Text wurde kopiert. Bitte im Kontaktformular in das Feld „Ihre Nachricht“ einfügen (Strg+V) und Pflichtfelder ausfüllen.", 9000);
       openFormOnly();
     });
 
@@ -531,6 +531,31 @@
       panelEl.__row = null;
     }
 
+    function lockMapUnderPanel(enable){
+      // Prevent map from panning/zooming when user scrolls/swipes on panel
+      if (!window.__bb_map) return;
+      const map = window.__bb_map;
+      try {
+        if (enable) {
+          map.dragging.disable();
+          map.scrollWheelZoom.disable();
+          map.doubleClickZoom.disable();
+          map.touchZoom.disable();
+          map.boxZoom.disable();
+          map.keyboard.disable();
+          if (map.tap) map.tap.disable();
+        } else {
+          map.dragging.enable();
+          map.scrollWheelZoom.enable();
+          map.doubleClickZoom.enable();
+          map.touchZoom.enable();
+          map.boxZoom.enable();
+          map.keyboard.enable();
+          if (map.tap) map.tap.enable();
+        }
+      } catch {}
+    }
+
     async function openPanel(row){
       if (!row || !row.id) return;
       panelEl.__row = row;
@@ -553,7 +578,7 @@
           <button class="p-close" type="button" aria-label="Schließen">×</button>
         </div>
 
-        <div class="p-body">
+        <div class="p-body" id="pBody">
           <div class="p-details">
             ${format ? `<div><b>Format:</b> ${format}</div>` : ""}
             ${price ? `<div><b>Preis:</b> ${price}</div>` : ""}
@@ -575,11 +600,43 @@
           ${notes ? `<div class="p-notes"><b>Hinweise:</b><br>${notes}</div>` : ""}
         </div>
       `;
+
       panelEl.style.display = "block";
+
+      // --- Stop Leaflet from grabbing touch/wheel gestures on mobile ---
+      // 1) Leaflet helpers if present
+      try {
+        if (window.L && L.DomEvent) {
+          L.DomEvent.disableClickPropagation(panelEl);
+          L.DomEvent.disableScrollPropagation(panelEl);
+        }
+      } catch {}
+
+      // 2) Explicit touch/wheel handling
+      const pBody = panelEl.querySelector("#pBody");
+      const stop = (ev) => { ev.stopPropagation(); };
+      const prevent = (ev) => { ev.preventDefault(); ev.stopPropagation(); };
+
+      // Allow scroll inside panel body, but prevent the map from panning under it
+      panelEl.onpointerdown = () => lockMapUnderPanel(true);
+      panelEl.onpointerup = () => lockMapUnderPanel(false);
+      panelEl.onpointercancel = () => lockMapUnderPanel(false);
+      panelEl.onpointerleave = () => lockMapUnderPanel(false);
+
+      // Stop map drag on touch moves over panel
+      panelEl.addEventListener("touchstart", stop, { passive:true });
+      panelEl.addEventListener("touchmove", stop, { passive:true });
+      panelEl.addEventListener("wheel", stop, { passive:true });
+
+      // If user uses two-finger scroll / weird cases, keep map locked
+      if (pBody) {
+        pBody.addEventListener("touchstart", stop, { passive:true });
+        pBody.addEventListener("touchmove", stop, { passive:true });
+      }
 
       // wire close
       const closeBtn = panelEl.querySelector(".p-close");
-      if (closeBtn) closeBtn.onclick = closePanel;
+      if (closeBtn) closeBtn.onclick = () => { lockMapUnderPanel(false); closePanel(); };
 
       // wire fav
       const favBtn = panelEl.querySelector(".p-fav-btn");
@@ -592,14 +649,16 @@
       if (photoWrap) {
         photoWrap.innerHTML = await loadPhotoHtml(row.id);
       }
+
+      // ensure panel scroll starts at top
+      if (pBody) pBody.scrollTop = 0;
     }
 
     // close panel when clicking outside it (inside map)
-    document.getElementById("map").addEventListener("click", (e) => {
+    mapEl.addEventListener("click", (e) => {
       if (panelEl.style.display === "none") return;
       const inside = panelEl.contains(e.target);
-      // If user clicks on map (not on panel), close it
-      if (!inside) closePanel();
+      if (!inside) { lockMapUnderPanel(false); closePanel(); }
     }, true);
 
     // Cache
@@ -653,6 +712,7 @@
       if (!L.markerClusterGroup) throw new Error("MarkerCluster ist nicht verfügbar.");
 
       const map = L.map("map", { scrollWheelZoom: true, zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      window.__bb_map = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19,
@@ -669,12 +729,6 @@
 
       map.on("moveend", () => saveMapPos(map));
       restoreMapPos(map);
-
-      // close panel when user starts moving the map (optional; feels natural)
-      map.on("movestart", () => {
-        // keep if you want; comment out if not desired
-        // closePanel();
-      });
 
       const renderRows = (rows) => {
         clusters.clearLayers();
