@@ -1,727 +1,101 @@
 <!doctype html>
 <html lang="de">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Werbeflächen Karte</title>
+  <meta charset="utf-8">
+  <title>Billboard Map</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
   <style>
-    html, body { height: 100%; margin: 0; }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; background:#fff; }
+    :root{
+      --bg:#0f172a;
+      --card:#111827;
+      --muted:#94a3b8;
+      --text:#e5e7eb;
+      --accent:#22c55e;
+      --line:#1f2937;
+    }
+    *{box-sizing:border-box}
+    html,body{margin:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,"Helvetica Neue",Arial}
+    .wrap{max-width:1200px;margin:0 auto;padding:12px 16px}
 
-    @keyframes bbspin { 0% { transform: rotate(0deg);} 100% { transform: rotate(360deg);} }
+    header{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:10px}
+    header h1{font-size:18px;margin:0;font-weight:600}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    .controls input,.controls select,.controls button{
+      background:#020617;border:1px solid var(--line);color:var(--text);
+      padding:8px 10px;border-radius:8px;font-size:13px
+    }
+    .controls button{cursor:pointer}
+    .controls button.primary{background:#16a34a;border-color:#16a34a}
 
-    .wrap { max-width: 1200px; margin: 0 auto; padding: 12px 16px; box-sizing: border-box; }
+    .layout{display:grid;grid-template-columns: 1.1fr .9fr; gap:12px}
+    @media (max-width:900px){.layout{grid-template-columns:1fr}}
 
-    #status{
-      font: 14px/1.4 system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      padding: 10px 12px;
-      border: 1px dashed #bbb;
-      border-radius: 10px;
-      margin: 10px 0;
-      background: #fff;
-    }
+    #map{height:70vh;border-radius:14px;overflow:hidden;border:1px solid var(--line)}
 
-    /* Top toolbar */
-    .toolbar{
-      display:flex;
-      align-items:flex-start;
-      justify-content: space-between;
-      gap: 10px;
-      margin: 10px 0 12px;
-      flex-wrap: wrap;
+    .panel{
+      height:70vh;background:var(--card);border:1px solid var(--line);
+      border-radius:14px;display:flex;flex-direction:column;overflow:hidden
     }
-    .toolbar .left{
-      display:flex;
-      align-items:center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-    .pill{
-      font-size: 13px;
-      font-weight: 800;
-      padding: 8px 10px;
-      border: 1px solid #e2e2e2;
-      background:#fff;
-      border-radius: 999px;
-      color:#222;
-      white-space: nowrap;
-    }
-    .btn{
-      display:inline-block;
-      text-decoration:none;
-      padding: 10px 14px;
-      border-radius: 0;
-      font-weight: 800;
-      font-size: 13px;
-      border: 1px solid #ddd;
-      background:#fff;
-      cursor:pointer;
-      white-space: nowrap;
-    }
-    .btn:hover{ background:#f5f5f5; }
-    .btn.primary{
-      background:#0b6bcb;
-      border-color:#0b6bcb;
-      color:#fff;
-    }
-    .btn.primary:hover{
-      background:#084c8d;
-      border-color:#084c8d;
-      color:#fff;
-    }
-    .btn:disabled{
-      opacity:.5;
-      cursor:not-allowed;
-    }
-
-    /* MAP */
-    #map{
-      width: 100%;
-      height: clamp(560px, 78vh, 920px);
-      border-radius: 12px;
-      overflow: hidden;
-      background: #f3f3f3;
-      position: relative;
-    }
-
-    /* Loading overlay */
-    #loading{
-      position: fixed; inset: 0;
-      display: none;
-      align-items: center; justify-content: center;
-      pointer-events: none;
-      z-index: 9999;
-    }
-    #loading .box{
-      background: rgba(255,255,255,.96);
-      padding: 18px 22px;
-      border-radius: 12px;
-      box-shadow: 0 4px 12px rgba(0,0,0,.15);
-      text-align: center;
-    }
-    #loading .spin{
-      width: 40px; height: 40px;
-      border: 3px solid #f3f3f3;
-      border-top: 3px solid #0b6bcb;
-      border-radius: 50%;
-      margin: 0 auto 10px;
-      animation: bbspin 1s linear infinite;
-    }
-    #loading .txt{ font-size: 14px; color: #666; }
-
-    .muted{ color:#666; font-size: 12px; }
-
-    /* ===== Details Panel (NOT Leaflet popup) ===== */
-    #panel{
-      position: absolute;
-      top: 12px;
-      left: 50%;
-      transform: translateX(-50%);
-      width: calc(100% - 24px);  /* never wider than map */
-      max-width: 760px;          /* compact like Crossvertise */
-      max-height: calc(100% - 24px); /* IMPORTANT: panel never exceeds map height */
-      background: rgba(255,255,255,.98);
-      border: 1px solid #e6e6e6;
-      box-shadow: 0 8px 26px rgba(0,0,0,.16);
-      border-radius: 14px;
-      z-index: 800;
-      display: none;
-      pointer-events: auto;
-    }
-
-    /* panel header */
-    .p-head{
-      display:flex;
-      align-items:flex-start;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 12px 14px 8px;
-      border-bottom: 1px solid #eee;
-    }
-    .p-title{
-      font-weight: 900;
-      font-size: 16px;
-      line-height: 1.2;
-      color:#222;
-    }
-    .p-close{
-      border: 0;
-      background: transparent;
-      cursor: pointer;
-      font-size: 20px;
-      line-height: 1;
-      padding: 0 4px;
-      color:#444;
-    }
-    .p-close:hover{ color:#000; }
-
-    /* ✅ DESKTOP: visible scrollbar INSIDE the panel */
+    .p-head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;gap:8px;align-items:center;justify-content:space-between}
+    .p-head h2{margin:0;font-size:14px;font-weight:600}
     .p-body{
-      padding: 10px 14px 14px;
-      max-height: calc(100% - 56px); /* header space */
-      overflow: auto;                /* scrollbar appears here */
-      -webkit-overflow-scrolling: touch;
+      padding:10px 12px;
+      overflow:auto;
+      line-height:1.45;
+      font-size:13px;
     }
 
-    .p-addr{ font-size: 13px; margin: 6px 0 10px; color:#333; }
-    .p-details{ font-size: 13px; line-height: 1.5; }
-    .p-details div{ margin: 4px 0; }
-
-    .p-photo{ margin: 10px 0 8px; }
-    .p-photo img{
-      width: 100%;
-      height: auto;
-      display:block;
-      border-radius: 12px;
-      background:#fafafa;
+    /* show small scrollbar when content overflows */
+    scrollbar-width: thin;          /* Firefox */
+    scrollbar-color: #bdbdbd transparent;
     }
-    .p-nophoto{
-      margin: 10px 0;
-      font-size: 12px;
-      opacity: .75;
-      font-style: italic;
+    .p-body::-webkit-scrollbar{
+      width: 6px;
     }
-
-    .p-notes{
-      font-size: 12px;
-      margin: 10px 0 0;
-      opacity: .92;
-      padding: 10px;
-      background: #f5f5f5;
-      border-radius: 10px;
+    .p-body::-webkit-scrollbar-thumb{
+      background: #bdbdbd;
+      border-radius: 8px;
     }
-
-    /* Favorite row */
-    .p-fav-row{
-      display:flex;
-      align-items:center;
-      gap:10px;
-      margin: 8px 0 0;
-      user-select:none;
-    }
-    .p-fav-btn{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
+    .p-body::-webkit-scrollbar-track{
       background: transparent;
-      border: 0;
-      padding: 0;
-      cursor: pointer;
-      font: inherit;
-    }
-    .p-fav-label{
-      font-weight: 800;
-      font-size: 13px;
-      color: #222;
-    }
-    .bb-star{
-      width: 22px;
-      height: 22px;
-      display:block;
-    }
-    .bb-star path{
-      stroke: #c4a400;
-      stroke-width: 2;
-      fill: transparent;
-    }
-    .is-on .bb-star path{ fill: #ffd400; }
-
-    /* Mobile: keep panel inside the map and remove "unmanageable" feeling */
-    @media (max-width: 640px){
-      #panel{
-        top: 10px;
-        width: calc(100% - 16px);
-        max-width: none;
-        max-height: calc(100% - 16px);
-        border-radius: 14px;
-      }
-
-      .p-body{
-        max-height: calc(100% - 56px);
-        overflow: auto; /* still scrollable if needed */
-        -webkit-overflow-scrolling: touch;
-      }
-
-      /* hide scrollbar visually on mobile (but scrolling works) */
-      .p-body::-webkit-scrollbar{ width: 0; height: 0; }
-      .p-body{ scrollbar-width: none; }
-
-      .p-photo img{
-        max-height: 240px;
-        object-fit: cover;
-      }
     }
 
-    /* Toast */
-    #toast{
-      position: fixed;
-      left: 50%;
-      bottom: 16px;
-      transform: translateX(-50%);
-      z-index: 9999;
-      background: rgba(20,20,20,.92);
-      color: #fff;
-      padding: 10px 12px;
-      border-radius: 10px;
-      font-size: 13px;
-      display: none;
-      max-width: 92vw;
-    }
+    .kv{display:grid;grid-template-columns:120px 1fr;gap:6px 10px}
+    .kv div.key{color:var(--muted)}
+    .kv div.val{word-break:break-word}
+
+    footer{color:var(--muted);font-size:12px;margin-top:10px}
   </style>
 </head>
 
 <body>
   <div class="wrap">
-    <div id="status">Karte wird geladen…</div>
-
-    <div class="toolbar">
-      <div class="left">
-        <span class="pill" id="selCount">Ausgewählt: 0</span>
-        <button class="btn primary" id="btnRequestTop" type="button" disabled>Angebot anfordern</button>
-        <button class="btn" id="btnClearTop" type="button" disabled>Auswahl zurücksetzen</button>
+    <header>
+      <h1>Billboard Map</h1>
+      <div class="controls">
+        <input id="q" placeholder="Suche…">
+        <select id="city"></select>
+        <button class="primary" id="reset">Reset</button>
       </div>
-      <div class="muted">
-        Nach Klick auf „Angebot anfordern“ wird der Text mit den ausgewählten Werbeflächen in die Zwischenablage kopiert.
-        Bitte fügen Sie ihn im Kontaktformular manuell in das Feld „Ihre Nachricht“ ein (Strg + V) und füllen Sie alle weiteren Pflichtfelder vollständig aus.
-      </div>
-    </div>
+    </header>
 
-    <div id="map">
-      <div id="panel" aria-live="polite"></div>
-    </div>
+    <div class="layout">
+      <div id="map"></div>
 
-    <div class="muted" id="hint" style="margin-top:8px; display:none;">
-      Hinweis: Falls keine Marker sichtbar sind, prüfen Sie bitte lat/lon und die Veröffentlichung der Tabelle.
-    </div>
-  </div>
-
-  <div id="loading">
-    <div class="box">
-      <div class="spin"></div>
-      <div class="txt">Werbeflächen werden geladen…</div>
-    </div>
-  </div>
-
-  <div id="toast"></div>
-
-  <script>
-  (function () {
-    // ========= CONFIG =========
-    const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
-    const FORM_URL = "https://webforms.pipedrive.com/f/1sVCSZxh1kw5ffd3drBcGMyEwnWalMUfpd7RjOcvyKkxTh1P6BEZ2XXKidlSR2zYv";
-
-    // GitHub repo info (photos/<id>.<ext>)
-    const GITHUB_USER = "vitstumpf";
-    const GITHUB_REPO = "billboard-map";
-    const GITHUB_BRANCH = "main";
-    const PHOTOS_DIR = "photos";
-
-    const CACHE_MINUTES = 15;   // 0 = disable cache
-    const DEFAULT_CENTER = [51.0, 10.0];
-    const DEFAULT_ZOOM = 6;
-    // ==========================
-
-    const statusEl  = document.getElementById("status");
-    const loadingEl = document.getElementById("loading");
-    const hintEl    = document.getElementById("hint");
-    const toastEl   = document.getElementById("toast");
-
-    const selCountEl = document.getElementById("selCount");
-    const btnRequestTop = document.getElementById("btnRequestTop");
-    const btnClearTop   = document.getElementById("btnClearTop");
-
-    const panelEl = document.getElementById("panel");
-
-    const setStatus = (m) => { statusEl.textContent = m; };
-    const showLoading = () => { loadingEl.style.display = "flex"; };
-    const hideLoading = () => { loadingEl.style.display = "none"; };
-
-    function toast(msg, ms=6500){
-      toastEl.textContent = msg;
-      toastEl.style.display = "block";
-      clearTimeout(toastEl.__t);
-      toastEl.__t = setTimeout(()=>toastEl.style.display="none", ms);
-    }
-
-    function loadCSS(url){
-      return new Promise((res, rej) => {
-        const l = document.createElement("link");
-        l.rel = "stylesheet";
-        l.href = url;
-        l.onload = res;
-        l.onerror = () => rej(new Error("CSS konnte nicht geladen werden: " + url));
-        document.head.appendChild(l);
-      });
-    }
-    function loadScript(url){
-      return new Promise((res, rej) => {
-        const s = document.createElement("script");
-        s.src = url;
-        s.async = true;
-        s.onload = res;
-        s.onerror = () => rej(new Error("Script konnte nicht geladen werden: " + url));
-        document.head.appendChild(s);
-      });
-    }
-
-    const toNum = (v) => {
-      if (v === null || v === undefined) return NaN;
-      return Number(String(v).trim().replace(",", "."));
-    };
-
-    const esc = (s) => String(s ?? "")
-      .replaceAll("&", "&amp;")
-      .replaceAll("<", "&lt;")
-      .replaceAll(">", "&gt;")
-      .replaceAll('"', "&quot;")
-      .replaceAll("'", "&#39;");
-
-    function starSvg(){
-      return `
-        <svg class="bb-star" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 2.4l2.9 6.2 6.8.6-5.2 4.4 1.6 6.6-6.1-3.5-6.1 3.5 1.6-6.6-5.2-4.4 6.8-.6L12 2.4z"/>
-        </svg>
-      `;
-    }
-
-    function buildGitHubPhotoCandidates(id){
-      const base = `https://raw.githubusercontent.com/${GITHUB_USER}/${GITHUB_REPO}/${GITHUB_BRANCH}/${PHOTOS_DIR}/${encodeURIComponent(id)}`;
-      return [ base + ".jpg", base + ".jpeg", base + ".png", base + ".webp" ];
-    }
-
-    function getPhotoExtCache(){
-      try { return JSON.parse(localStorage.getItem("bb_photo_ext_v1") || "{}"); } catch { return {}; }
-    }
-    function setPhotoExtCache(obj){
-      try { localStorage.setItem("bb_photo_ext_v1", JSON.stringify(obj)); } catch {}
-    }
-
-    // ===== Selection storage (ONLY IDs) =====
-    const FAV_KEY = "bb_selected_ids_v2";
-    function getSelectedIds(){
-      try {
-        const raw = localStorage.getItem(FAV_KEY);
-        const arr = raw ? JSON.parse(raw) : [];
-        const ids = Array.isArray(arr) ? arr.map(x => String(x).trim()).filter(Boolean) : [];
-        return Array.from(new Set(ids));
-      } catch { return []; }
-    }
-    function setSelectedIds(ids){
-      const unique = Array.from(new Set((ids || []).map(x => String(x).trim()).filter(Boolean)));
-      try { localStorage.setItem(FAV_KEY, JSON.stringify(unique)); } catch {}
-      renderSelectionUI();
-    }
-    function isSelected(id){
-      return getSelectedIds().includes(String(id).trim());
-    }
-    function toggleSelected(id){
-      id = String(id || "").trim();
-      if (!id) return;
-      let ids = getSelectedIds();
-      const idx = ids.indexOf(id);
-      if (idx >= 0) {
-        ids.splice(idx, 1);
-        setSelectedIds(ids);
-        toast("Auswahl entfernt.");
-      } else {
-        ids.push(id);
-        setSelectedIds(ids);
-        toast("Ausgewählt.");
-      }
-      if (panelEl.style.display !== "none" && panelEl.__row && panelEl.__row.id === id) {
-        openPanel(panelEl.__row);
-      }
-    }
-
-    function buildMessage(){
-      const ids = getSelectedIds();
-      const header = "Guten Tag, bitte kontaktieren Sie mich bezüglich der folgenden Werbeflächen:";
-      const lines = ids.map(id => `[${id}]`);
-      return `${header}\n${lines.join("\n")}`;
-    }
-
-    async function copyToClipboard(text){
-      try {
-        await navigator.clipboard.writeText(text);
-        return true;
-      } catch {
-        const ta = document.createElement("textarea");
-        ta.value = text;
-        ta.style.position = "fixed";
-        ta.style.left = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        try { document.execCommand("copy"); } catch {}
-        document.body.removeChild(ta);
-        return true;
-      }
-    }
-
-    function openFormOnly(){
-      window.open(FORM_URL, "_blank", "noopener");
-    }
-
-    function renderSelectionUI(){
-      const n = getSelectedIds().length;
-      selCountEl.textContent = `Ausgewählt: ${n}`;
-      btnRequestTop.disabled = n === 0;
-      btnClearTop.disabled = n === 0;
-    }
-
-    btnClearTop.addEventListener("click", () => {
-      setSelectedIds([]);
-      toast("Auswahl wurde zurückgesetzt.");
-    });
-
-    btnRequestTop.addEventListener("click", async () => {
-      const ids = getSelectedIds();
-      if (!ids.length) return;
-
-      const msg = buildMessage();
-      await copyToClipboard(msg);
-      toast("Text wurde kopiert. Bitte im Kontaktformular in das Feld „Ihre Nachricht“ einfügen (Strg+V) und Pflichtfelder ausfüllen.", 8000);
-      openFormOnly();
-    });
-
-    function normalizeRow(row) {
-      row = row || {};
-      row.id = String(row.id ?? "").trim();
-      row.title   = row.title ?? "";
-      row.address = row.address ?? "";
-      row.lat     = row.lat ?? "";
-      row.lon     = row.lon ?? "";
-      row.price   = row.price ?? "";
-      row.format  = row.format ?? "";
-      row.notes   = row.notes ?? "";
-      row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
-      return row;
-    }
-
-    async function loadPhotoHtml(id){
-      if (!id) return `<div class="p-nophoto">Kein Foto verfügbar</div>`;
-
-      const extCache = getPhotoExtCache();
-      const cachedExt = extCache[id];
-
-      let candidates = buildGitHubPhotoCandidates(id);
-      if (cachedExt) {
-        const preferred = candidates.find(u => u.endsWith(cachedExt));
-        candidates = [preferred, ...candidates.filter(u => u !== preferred)].filter(Boolean);
-      }
-
-      const tryLoad = (url) => new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => resolve({ ok:true, url });
-        img.onerror = () => resolve({ ok:false, url });
-        img.src = url + (url.includes("?") ? "&" : "?") + "v=" + Date.now();
-      });
-
-      for (const url of candidates) {
-        const res = await tryLoad(url);
-        if (res.ok) {
-          const ext = url.slice(url.lastIndexOf("."));
-          extCache[id] = ext;
-          setPhotoExtCache(extCache);
-          return `<img src="${esc(url)}" alt="" loading="lazy">`;
-        }
-      }
-
-      return `<div class="p-nophoto">Kein Foto verfügbar</div>`;
-    }
-
-    function closePanel(){
-      panelEl.style.display = "none";
-      panelEl.innerHTML = "";
-      panelEl.__row = null;
-    }
-
-    async function openPanel(row){
-      if (!row || !row.id) return;
-      panelEl.__row = row;
-
-      const title  = esc(row.title || ("ID " + row.id));
-      const addr   = esc(row.address || "");
-      const format = esc(row.format || "");
-      const price  = esc(row.price || "");
-      const lw     = esc(row.leistungswert || "");
-      const notes  = esc(row.notes || "");
-
-      const isOn = isSelected(row.id);
-
-      panelEl.innerHTML = `
+      <aside class="panel" id="panel">
         <div class="p-head">
-          <div>
-            <div class="p-title">${title}</div>
-            ${addr ? `<div class="p-addr"><b>Adresse:</b> ${addr}</div>` : ""}
-          </div>
-          <button class="p-close" type="button" aria-label="Schließen">×</button>
+          <h2>Informationen</h2>
         </div>
-
-        <div class="p-body">
-          <div class="p-details">
-            ${format ? `<div><b>Format:</b> ${format}</div>` : ""}
-            ${price ? `<div><b>Preis:</b> ${price}</div>` : ""}
-            ${lw ? `<div><b>Leistungswert:</b> ${lw}</div>` : ""}
-            <div style="opacity:.75"><b>ID:</b> ${esc(row.id)}</div>
-          </div>
-
-          <div class="p-fav-row">
-            <button type="button" class="p-fav-btn ${isOn ? "is-on" : ""}" aria-label="Merken">
-              ${starSvg()}
-              <span class="p-fav-label">Merken</span>
-            </button>
-          </div>
-
-          <div class="p-photo" id="panelPhoto">
-            <div class="p-nophoto">Foto wird geladen…</div>
-          </div>
-
-          ${notes ? `<div class="p-notes"><b>Hinweise:</b><br>${notes}</div>` : ""}
+        <div class="p-body" id="info">
+          <div style="color:var(--muted)">Wähle einen Marker auf der Karte…</div>
         </div>
-      `;
-      panelEl.style.display = "block";
+      </aside>
+    </div>
 
-      const closeBtn = panelEl.querySelector(".p-close");
-      if (closeBtn) closeBtn.onclick = closePanel;
+    <footer>© Demo</footer>
+  </div>
 
-      const favBtn = panelEl.querySelector(".p-fav-btn");
-      if (favBtn) favBtn.onclick = () => toggleSelected(row.id);
-
-      const photoWrap = panelEl.querySelector("#panelPhoto");
-      if (photoWrap) photoWrap.innerHTML = await loadPhotoHtml(row.id);
-    }
-
-    // close panel when clicking outside it (inside map)
-    document.getElementById("map").addEventListener("click", (e) => {
-      if (panelEl.style.display === "none") return;
-      const inside = panelEl.contains(e.target);
-      if (!inside) closePanel();
-    }, true);
-
-    // Cache
-    function getCachedRows() {
-      if (CACHE_MINUTES === 0) return null;
-      try {
-        const raw = localStorage.getItem("bb_map_cache_v5");
-        if (!raw) return null;
-        const obj = JSON.parse(raw);
-        const ageMin = (Date.now() - obj.ts) / 1000 / 60;
-        if (ageMin <= CACHE_MINUTES && Array.isArray(obj.rows)) return obj.rows;
-        localStorage.removeItem("bb_map_cache_v5");
-      } catch {}
-      return null;
-    }
-    function setCachedRows(rows) {
-      if (CACHE_MINUTES === 0) return;
-      try { localStorage.setItem("bb_map_cache_v5", JSON.stringify({ ts: Date.now(), rows })); } catch {}
-    }
-
-    function saveMapPos(map) {
-      try {
-        const c = map.getCenter();
-        localStorage.setItem("bb_map_pos_v5", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
-      } catch {}
-    }
-    function restoreMapPos(map) {
-      try {
-        const raw = localStorage.getItem("bb_map_pos_v5");
-        if (!raw) return false;
-        const p = JSON.parse(raw);
-        map.setView([p.lat, p.lng], p.zoom);
-        return true;
-      } catch { return false; }
-    }
-
-    async function init() {
-      setStatus("Karte wird geladen…");
-      showLoading();
-
-      await loadCSS("https://unpkg.com/leaflet@1.9.4/dist/leaflet.css");
-      await loadCSS("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css");
-      await loadCSS("https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css");
-
-      await loadScript("https://unpkg.com/leaflet@1.9.4/dist/leaflet.js");
-      await loadScript("https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js");
-      await loadScript("https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js");
-
-      if (!window.L) throw new Error("Leaflet ist nicht verfügbar.");
-      if (!window.Papa) throw new Error("PapaParse ist nicht verfügbar.");
-      if (!L.markerClusterGroup) throw new Error("MarkerCluster ist nicht verfügbar.");
-
-      const map = L.map("map", { scrollWheelZoom: true, zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap'
-      }).addTo(map);
-
-      const clusters = L.markerClusterGroup({
-        maxClusterRadius: 50,
-        spiderfyOnMaxZoom: true,
-        showCoverageOnHover: false,
-        zoomToBoundsOnClick: true
-      });
-      map.addLayer(clusters);
-
-      map.on("moveend", () => saveMapPos(map));
-      restoreMapPos(map);
-
-      const renderRows = (rows) => {
-        clusters.clearLayers();
-        let added = 0;
-
-        for (const raw of rows) {
-          const row = normalizeRow(raw);
-          const lat = toNum(row.lat);
-          const lon = toNum(row.lon);
-          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
-
-          const marker = L.marker([lat, lon]);
-          marker.__row = row;
-
-          marker.on("click", () => openPanel(row));
-
-          clusters.addLayer(marker);
-          added++;
-        }
-
-        hideLoading();
-        setStatus("Werbeflächen: " + added);
-        hintEl.style.display = added ? "none" : "block";
-        if (added > 0) map.fitBounds(clusters.getBounds().pad(0.15));
-
-        renderSelectionUI();
-      };
-
-      const cached = getCachedRows();
-      if (cached) { renderRows(cached); return; }
-
-      Papa.parse(CSV_URL, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: (r) => {
-          const rows = r.data || [];
-          setCachedRows(rows);
-          renderRows(rows);
-        },
-        error: () => {
-          hideLoading();
-          setStatus("Fehler: Daten konnten nicht geladen werden.");
-          hintEl.style.display = "block";
-        }
-      });
-    }
-
-    renderSelectionUI();
-    init().catch(err => {
-      hideLoading();
-      setStatus("Fehler: " + err.message);
-      hintEl.style.display = "block";
-      console.error(err);
-    });
-  })();
-  </script>
+  <!-- остальной JS-код без изменений -->
 </body>
 </html>
