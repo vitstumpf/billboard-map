@@ -358,7 +358,7 @@
       border-color:#084c8d;
     }
 
-    /* Suggestions dropdown (unter dem Input) */
+    /* Suggestions dropdown */
     #suggestions{
       position:absolute;
       top:100%;
@@ -434,7 +434,6 @@
         <button class="btn" id="btnClearTop" type="button" disabled>Auswahl zurücksetzen</button>
       </div>
 
-      <!-- Suche + Geocoding -->
       <div class="left">
         <div class="search-container">
           <button type="button" class="search-clear-btn disabled" id="btnClearSearch" aria-label="Suche löschen">×</button>
@@ -509,6 +508,8 @@
     let geoSuggestTimer = null;
     let lastSuggestQuery = "";
     let geoMarker = null;
+    let map, clusters;
+    let defaultIcon, redIcon;
 
     const setStatus = (m) => { statusEl.textContent = m; };
     const showLoading = () => { loadingEl.style.display = "flex"; };
@@ -727,24 +728,24 @@
 
     function lockMapUnderPanel(enable){
       if (!window.__bb_map) return;
-      const map = window.__bb_map;
+      const mapLocal = window.__bb_map;
       try {
         if (enable) {
-          map.dragging.disable();
-          map.scrollWheelZoom.disable();
-          map.doubleClickZoom.disable();
-          map.touchZoom.disable();
-          map.boxZoom.disable();
-          map.keyboard.disable();
-          if (map.tap) map.tap.disable();
+          mapLocal.dragging.disable();
+          mapLocal.scrollWheelZoom.disable();
+          mapLocal.doubleClickZoom.disable();
+          mapLocal.touchZoom.disable();
+          mapLocal.boxZoom.disable();
+          mapLocal.keyboard.disable();
+          if (mapLocal.tap) mapLocal.tap.disable();
         } else {
-          map.dragging.enable();
-          map.scrollWheelZoom.enable();
-          map.doubleClickZoom.enable();
-          map.touchZoom.enable();
-          map.boxZoom.enable();
-          map.keyboard.enable();
-          if (map.tap) map.tap.enable();
+          mapLocal.dragging.enable();
+          mapLocal.scrollWheelZoom.enable();
+          mapLocal.doubleClickZoom.enable();
+          mapLocal.touchZoom.enable();
+          mapLocal.boxZoom.enable();
+          mapLocal.keyboard.enable();
+          if (mapLocal.tap) mapLocal.tap.enable();
         }
       } catch {}
     }
@@ -854,18 +855,18 @@
       try { localStorage.setItem("bb_map_cache_v5", JSON.stringify({ ts: Date.now(), rows })); } catch {}
     }
 
-    function saveMapPos(map) {
+    function saveMapPos(mapLocal) {
       try {
-        const c = map.getCenter();
-        localStorage.setItem("bb_map_pos_v5", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
+        const c = mapLocal.getCenter();
+        localStorage.setItem("bb_map_pos_v5", JSON.stringify({ lat: c.lat, lng: c.lng, zoom: mapLocal.getZoom() }));
       } catch {}
     }
-    function restoreMapPos(map) {
+    function restoreMapPos(mapLocal) {
       try {
         const raw = localStorage.getItem("bb_map_pos_v5");
         if (!raw) return false;
         const p = JSON.parse(raw);
-        map.setView([p.lat, p.lng], p.zoom);
+        mapLocal.setView([p.lat, p.lng], p.zoom);
         return true;
       } catch { return false; }
     }
@@ -916,8 +917,8 @@
       hideSuggestions();
       updateClearButton();
       applySearchFilter();
-      if (geoMarker && window.__bb_map) {
-        window.__bb_map.removeLayer(geoMarker);
+      if (geoMarker && map) {
+        map.removeLayer(geoMarker);
         geoMarker = null;
       }
     }
@@ -1024,8 +1025,8 @@
       applySearchFilter();
 
       if (!q) {
-        if (geoMarker && window.__bb_map) {
-          window.__bb_map.removeLayer(geoMarker);
+        if (geoMarker && map) {
+          map.removeLayer(geoMarker);
           geoMarker = null;
         }
         hideSuggestions();
@@ -1043,8 +1044,7 @@
     }
 
     function focusAddressOnMap(res) {
-      if (!window.__bb_map || !res) return;
-      const map = window.__bb_map;
+      if (!map || !res) return;
       const center = [res.lat, res.lon];
 
       map.setView(center, 15);
@@ -1053,13 +1053,7 @@
         map.removeLayer(geoMarker);
         geoMarker = null;
       }
-      geoMarker = L.circleMarker(center, {
-        radius: 6,
-        color: "#0b6bcb",
-        weight: 2,
-        fillColor: "#ffffff",
-        fillOpacity: 1
-      }).addTo(map);
+      geoMarker = L.marker(center, { icon: redIcon }).addTo(map);
 
       toast("Adresse gefunden. Werbeanlagen in der Nähe sind nun sichtbar.", 5000);
     }
@@ -1080,7 +1074,7 @@
       if (!window.Papa) throw new Error("PapaParse ist nicht verfügbar.");
       if (!L.markerClusterGroup) throw new Error("MarkerCluster ist nicht verfügbar.");
 
-      const map = L.map("map", { scrollWheelZoom: true, zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
+      map = L.map("map", { scrollWheelZoom: true, zoomControl: true }).setView(DEFAULT_CENTER, DEFAULT_ZOOM);
       window.__bb_map = map;
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -1088,7 +1082,25 @@
         attribution: '&copy; OpenStreetMap'
       }).addTo(map);
 
-      const clusters = L.markerClusterGroup({
+      // Standard-Icon und rotes Icon (gleiches Layout, andere Farbe)
+      defaultIcon = L.icon({
+        iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+        shadowSize: [41, 41]
+      });
+      redIcon = L.icon({
+        iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png",
+        iconSize: [25, 41],
+        iconAnchor: [12, 41],
+        popupAnchor: [1, -34],
+        shadowUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png",
+        shadowSize: [41, 41]
+      });
+
+      clusters = L.markerClusterGroup({
         maxClusterRadius: 50,
         spiderfyOnMaxZoom: true,
         showCoverageOnHover: false,
@@ -1110,7 +1122,7 @@
           const lon = toNum(row.lon);
           if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
 
-          const marker = L.marker([lat, lon]);
+          const marker = L.marker([lat, lon], { icon: defaultIcon });
           marker.__row = row;
 
           marker.on("click", () => {
