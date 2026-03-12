@@ -136,7 +136,7 @@
       overflow: hidden;    /* keep inside map */
       touch-action: pan-y; /* allow vertical scroll on mobile */
 
-      /* >>> ADDED (only): make panel layout fixed so inner scroll works <<< */
+      /* panel layout fixed so inner scroll works */
       display: none;
       flex-direction: column;
     }
@@ -174,11 +174,9 @@
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
 
-      /* >>> ADDED (only): force inner scrolling inside the panel <<< */
       flex: 1 1 auto;
       min-height: 0;
 
-      /* Desktop: show a small scrollbar INSIDE the panel */
       scrollbar-width: thin;
       scrollbar-color: rgba(0,0,0,.35) transparent;
     }
@@ -274,7 +272,6 @@
         max-height: 240px;
         object-fit: cover;
       }
-
       /* Mobile: hide scrollbar visually (still scrollable) */
       .p-body{ scrollbar-width: none; }
       .p-body::-webkit-scrollbar{ width: 0; height: 0; }
@@ -295,45 +292,62 @@
       display: none;
       max-width: 92vw;
     }
-    /* === FIX: Scroll INSIDE info panel (Desktop only) === */
-@media (min-width: 641px){
-  #panel{
-    display: none;            /* JS will switch to flex */
-    flex-direction: column;  /* header top, body scrolls */
-  }
 
-  .p-body{
-    flex: 1 1 auto;           /* take remaining height */
-    min-height: 0;            /* IMPORTANT for scrolling */
-    overflow-y: auto;         /* force vertical scroll */
-  }
+    /* Desktop: scroll INSIDE info panel */
+    @media (min-width: 641px){
+      #panel{
+        display: none;
+        flex-direction: column;
+      }
 
-  .p-body::-webkit-scrollbar{
-    width: 8px;
-  }
-  .p-body::-webkit-scrollbar-thumb{
-    background: rgba(0,0,0,.35);
-    border-radius: 10px;
-  }
-}
+      .p-body{
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+      }
 
+      .p-body::-webkit-scrollbar{
+        width: 8px;
+      }
+      .p-body::-webkit-scrollbar-thumb{
+        background: rgba(0,0,0,.35);
+        border-radius: 10px;
+      }
+    }
+
+    /* Search input placeholder */
+    #searchInput::placeholder{
+      color:#999;
+    }
   </style>
 </head>
 
 <body>
   <div class="wrap">
     <div id="status">Karte wird geladen…</div>
-<div class="muted">
-        Nach Klick auf „Angebot anfordern“ wird der Text mit den ausgewählten Werbeflächen in die Zwischenablage kopiert.
-        Bitte fügen Sie ihn im Kontaktformular manuell in das Feld „Ihre Nachricht“ ein (Strg + V) und füllen Sie alle weiteren Pflichtfelder vollständig aus.
-      </div>
+    <div class="muted">
+      Nach Klick auf „Angebot anfordern“ wird der Text mit den ausgewählten Werbeflächen in die Zwischenablage kopiert.
+      Bitte fügen Sie ihn im Kontaktformular manuell in das Feld „Ihre Nachricht“ ein (Strg + V) und füllen Sie alle weiteren Pflichtfelder vollständig aus.
+    </div>
+
     <div class="toolbar">
       <div class="left">
         <span class="pill" id="selCount">Ausgewählt: 0</span>
         <button class="btn primary" id="btnRequestTop" type="button" disabled>Angebot anfordern</button>
         <button class="btn" id="btnClearTop" type="button" disabled>Auswahl zurücksetzen</button>
       </div>
-      
+
+      <!-- Suche + Geocoding -->
+      <div class="left">
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Suche oder Adresse eingeben …"
+          style="padding:8px 10px;border:1px solid #ccc;border-radius:6px;min-width:260px;font-size:13px;"
+        />
+        <button class="btn" id="btnClearSearch" type="button">Suche löschen</button>
+        <button class="btn" id="btnGeocode" type="button">Adresse auf Karte</button>
+      </div>
     </div>
 
     <div id="map">
@@ -382,6 +396,13 @@
 
     const mapEl = document.getElementById("map");
     const panelEl = document.getElementById("panel");
+
+    const searchInput = document.getElementById("searchInput");
+    const btnClearSearch = document.getElementById("btnClearSearch");
+    const btnGeocode = document.getElementById("btnGeocode");
+
+    let ALL_ROWS = [];
+    let CURRENT_ROWS = [];
 
     const setStatus = (m) => { statusEl.textContent = m; };
     const showLoading = () => { loadingEl.style.display = "flex"; };
@@ -543,7 +564,7 @@
       row.lon     = row.lon ?? "";
       row.price   = row.price ?? "";
       row.format  = row.format ?? "";
-      // IMPORTANT: support various column headers for comments/notes
+
       row.notes = row.notes
         || row.note
         || row.notes_text
@@ -558,6 +579,7 @@
         || row["Hinweise"]
         || row["hinweise"]
         || "";
+
       row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
       return row;
     }
@@ -634,7 +656,6 @@
       const price  = esc(row.price || "");
       const lw     = esc(row.leistungswert || "");
       const notes  = esc(row.notes || "");
-
       const isOn = isSelected(row.id);
 
       panelEl.innerHTML = `
@@ -671,7 +692,6 @@
 
       panelEl.style.display = "flex";
 
-      // Leaflet helpers if present
       try {
         if (window.L && L.DomEvent) {
           L.DomEvent.disableClickPropagation(panelEl);
@@ -682,7 +702,6 @@
       const pBody = panelEl.querySelector("#pBody");
       const stop = (ev) => { ev.stopPropagation(); };
 
-      // Prevent map from reacting when user interacts with panel
       panelEl.onpointerdown = () => lockMapUnderPanel(true);
       panelEl.onpointerup = () => lockMapUnderPanel(false);
       panelEl.onpointercancel = () => lockMapUnderPanel(false);
@@ -750,6 +769,66 @@
       } catch { return false; }
     }
 
+    // ---------- Suche über Tabellen-Daten ----------
+
+    function rowMatchesQuery(row, query) {
+      if (!query) return true;
+      query = query.toLowerCase();
+      const n = normalizeRow(row);
+
+      const haystack =
+        (n.id + " " +
+         n.title + " " +
+         n.address + " " +
+         n.format + " " +
+         n.price + " " +
+         n.leistungswert + " " +
+         n.notes).toLowerCase();
+
+      return haystack.includes(query);
+    }
+
+    function applySearchFilter() {
+      const q = searchInput ? searchInput.value.trim() : "";
+      if (!q) {
+        CURRENT_ROWS = ALL_ROWS.slice();
+        if (window.__bb_renderRows) window.__bb_renderRows(CURRENT_ROWS);
+        return;
+      }
+      const filtered = ALL_ROWS.filter(r => rowMatchesQuery(r, q));
+      CURRENT_ROWS = filtered;
+      if (window.__bb_renderRows) window.__bb_renderRows(filtered);
+    }
+
+    // ---------- Geocoding: Adresse -> Karte ----------
+
+    async function geocodeAddress(query) {
+      if (!query) return null;
+      const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
+                  encodeURIComponent(query);
+      try {
+        const res = await fetch(url, {
+          headers: {
+            "Accept": "application/json"
+          }
+        });
+        if (!res.ok) throw new Error("Geocoding-Fehler: HTTP " + res.status);
+        const data = await res.json();
+        if (!Array.isArray(data) || !data.length) return null;
+        const item = data[0];
+        return {
+          lat: parseFloat(item.lat),
+          lon: parseFloat(item.lon),
+          displayName: item.display_name || ""
+        };
+      } catch (e) {
+        console.error(e);
+        return null;
+      }
+    }
+
+    // ---------- Init ----------
+
     async function init() {
       setStatus("Karte wird geladen…");
       showLoading();
@@ -786,6 +865,7 @@
       restoreMapPos(map);
 
       const renderRows = (rows) => {
+        CURRENT_ROWS = rows || [];
         clusters.clearLayers();
         let added = 0;
 
@@ -814,8 +894,15 @@
         renderSelectionUI();
       };
 
+      // globaler Zugriff für Suche
+      window.__bb_renderRows = renderRows;
+
       const cached = getCachedRows();
-      if (cached) { renderRows(cached); return; }
+      if (cached) {
+        ALL_ROWS = cached;
+        renderRows(cached);
+        return;
+      }
 
       Papa.parse(CSV_URL, {
         download: true,
@@ -823,6 +910,7 @@
         skipEmptyLines: true,
         complete: (r) => {
           const rows = r.data || [];
+          ALL_ROWS = rows;
           setCachedRows(rows);
           renderRows(rows);
         },
@@ -831,6 +919,63 @@
           setStatus("Fehler: Daten konnten nicht geladen werden.");
           hintEl.style.display = "block";
         }
+      });
+    }
+
+    // ---------- Events für Suche & Geocoding ----------
+
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        applySearchFilter();
+      });
+      searchInput.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") applySearchFilter();
+      });
+    }
+
+    if (btnClearSearch && searchInput) {
+      btnClearSearch.addEventListener("click", () => {
+        searchInput.value = "";
+        applySearchFilter();
+      });
+    }
+
+    if (btnGeocode && searchInput) {
+      btnGeocode.addEventListener("click", async () => {
+        const q = searchInput.value.trim();
+        if (!q) {
+          toast("Bitte zuerst eine Adresse eingeben.", 3000);
+          return;
+        }
+        toast("Adresse wird gesucht…", 3000);
+        const res = await geocodeAddress(q);
+        if (!res || !Number.isFinite(res.lat) || !Number.isFinite(res.lon)) {
+          toast("Adresse konnte nicht gefunden werden.", 4000);
+          return;
+        }
+
+        if (!window.__bb_map) {
+          toast("Karte noch nicht bereit.", 3000);
+          return;
+        }
+
+        const map = window.__bb_map;
+        const center = [res.lat, res.lon];
+
+        map.setView(center, 15);
+
+        if (window.__geoCircle) {
+          map.removeLayer(window.__geoCircle);
+          window.__geoCircle = null;
+        }
+        window.__geoCircle = L.circle(center, {
+          radius: 500,
+          color: "#0b6bcb",
+          fillColor: "#0b6bcb",
+          fillOpacity: 0.08
+        }).addTo(map);
+
+        toast("Adresse gefunden. Werbeanlagen in der Nähe sind nun sichtbar.", 5000);
       });
     }
 
