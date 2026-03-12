@@ -72,7 +72,7 @@
     }
     .btn:disabled{ opacity:.5; cursor:not-allowed; }
 
-    /* MAP: higher, close to full screen */
+    /* MAP */
     #map{
       width: 100%;
       height: clamp(560px, 78vh, 920px);
@@ -109,22 +109,15 @@
 
     .muted{ color:#666; font-size: 12px; }
 
-    /* ===== Details Panel (NOT Leaflet popup) ===== */
+    /* ===== Details Panel ===== */
     #panel{
       position: absolute;
       top: 12px;
       left: 50%;
       transform: translateX(-50%);
-
-      /* Never wider than map */
       width: calc(100% - 24px);
-
-      /* Desktop: ~1/3 smaller than before */
       max-width: 460px;
-
-      /* NEVER exceed map height */
       max-height: calc(100% - 24px);
-
       background: rgba(255,255,255,.98);
       border: 1px solid #e6e6e6;
       box-shadow: 0 8px 26px rgba(0,0,0,.16);
@@ -132,16 +125,12 @@
       z-index: 800;
       display: none;
       pointer-events: auto;
-
-      overflow: hidden;    /* keep inside map */
-      touch-action: pan-y; /* allow vertical scroll on mobile */
-
-      /* panel layout fixed so inner scroll works */
+      overflow: hidden;
+      touch-action: pan-y;
       display: none;
       flex-direction: column;
     }
 
-    /* panel header */
     .p-head{
       display:flex;
       align-items:flex-start;
@@ -173,10 +162,8 @@
       overflow: auto;
       -webkit-overflow-scrolling: touch;
       touch-action: pan-y;
-
       flex: 1 1 auto;
       min-height: 0;
-
       scrollbar-width: thin;
       scrollbar-color: rgba(0,0,0,.35) transparent;
     }
@@ -201,7 +188,6 @@
       background:#fafafa;
     }
 
-    /* Desktop: reduce photo height so comments fit */
     @media (min-width: 641px){
       .p-photo img{
         max-height: 280px;
@@ -225,7 +211,6 @@
       border-radius: 10px;
     }
 
-    /* Favorite row */
     .p-fav-row{
       display:flex;
       align-items:center;
@@ -260,7 +245,6 @@
     }
     .is-on .bb-star path{ fill: #ffd400; }
 
-    /* Mobile: keep panel fully inside the map */
     @media (max-width: 640px){
       #panel{
         top: 10px;
@@ -272,7 +256,6 @@
         max-height: 240px;
         object-fit: cover;
       }
-      /* Mobile: hide scrollbar visually (still scrollable) */
       .p-body{ scrollbar-width: none; }
       .p-body::-webkit-scrollbar{ width: 0; height: 0; }
     }
@@ -293,7 +276,6 @@
       max-width: 92vw;
     }
 
-    /* Desktop: scroll INSIDE info panel */
     @media (min-width: 641px){
       #panel{
         display: none;
@@ -315,9 +297,113 @@
       }
     }
 
-    /* Search input placeholder */
+    /* Search UI */
+    .search-wrapper{
+      position: relative;
+      display:flex;
+      align-items:center;
+    }
+    #searchInput{
+      padding:8px 28px 8px 10px;
+      border:1px solid #ccc;
+      border-radius:20px 0 0 20px;
+      min-width:260px;
+      font-size:13px;
+      outline:none;
+    }
     #searchInput::placeholder{
       color:#999;
+    }
+    .search-clear{
+      position:absolute;
+      right:8px;
+      top:50%;
+      transform:translateY(-50%);
+      width:16px;
+      height:16px;
+      border-radius:50%;
+      border:none;
+      background:transparent;
+      font-size:14px;
+      line-height:16px;
+      text-align:center;
+      padding:0;
+      cursor:pointer;
+      color:#666;
+      display:none;
+    }
+    .search-clear:hover{
+      color:#000;
+    }
+
+    .search-button{
+      border-radius:0 20px 20px 0;
+      border:1px solid #0b6bcb;
+      border-left:none;
+      background:#0b6bcb;
+      color:#fff;
+      width:40px;
+      height:34px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      font-size:16px;
+    }
+    .search-button:hover{
+      background:#084c8d;
+      border-color:#084c8d;
+    }
+
+    /* Suggestions dropdown */
+    #suggestions{
+      position:absolute;
+      top:100%;
+      left:0;
+      width:100%;
+      max-height:260px;
+      overflow:auto;
+      background:#fff;
+      border:1px solid #ddd;
+      border-radius:0 0 16px 16px;
+      box-shadow:0 8px 26px rgba(0,0,0,.16);
+      z-index:1000;
+      display:none;
+    }
+    .suggest-item{
+      display:flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      cursor:pointer;
+      font-size:13px;
+      border-top:1px solid #f0f0f0;
+    }
+    .suggest-item:first-child{
+      border-top:none;
+    }
+    .suggest-item:hover{
+      background:#f5f5f5;
+    }
+    .suggest-icon{
+      width:18px;
+      height:18px;
+      border-radius:999px;
+      border:2px solid #0b6bcb;
+      display:inline-block;
+    }
+
+    @media (max-width:640px){
+      .search-wrapper{
+        width:100%;
+      }
+      #searchInput{
+        flex:1;
+        min-width:0;
+      }
+      #suggestions{
+        max-width:100%;
+      }
     }
   </style>
 </head>
@@ -339,14 +425,18 @@
 
       <!-- Suche + Geocoding -->
       <div class="left">
-        <input
-          type="text"
-          id="searchInput"
-          placeholder="Suche oder Adresse eingeben …"
-          style="padding:8px 10px;border:1px solid #ccc;border-radius:6px;min-width:260px;font-size:13px;"
-        />
-        <button class="btn" id="btnClearSearch" type="button">Suche löschen</button>
-        <button class="btn" id="btnGeocode" type="button">Adresse auf Karte</button>
+        <div class="search-wrapper">
+          <input
+            type="text"
+            id="searchInput"
+            placeholder="Suche nach Werbefläche oder Adresse …"
+          />
+          <button type="button" class="search-clear" id="btnClearSearch" aria-label="Suche löschen">×</button>
+          <button class="search-button" id="btnGeocode" type="button" aria-label="Adresse suchen">
+            🔍
+          </button>
+          <div id="suggestions"></div>
+        </div>
       </div>
     </div>
 
@@ -374,15 +464,16 @@
     const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
     const FORM_URL = "https://webforms.pipedrive.com/f/1rqc7SFMmd0tMGqY1NFzq1ZRpMihVWgWVsaSEYjMKRtYf2zpk9zjTHRUnYp7nYPvR";
 
-    // GitHub repo info (photos/<id>.<ext>)
     const GITHUB_USER = "vitstumpf";
     const GITHUB_REPO = "billboard-map";
     const GITHUB_BRANCH = "main";
     const PHOTOS_DIR = "photos";
 
-    const CACHE_MINUTES = 15;   // 0 = disable cache
+    const CACHE_MINUTES = 15;
     const DEFAULT_CENTER = [51.0, 10.0];
     const DEFAULT_ZOOM = 6;
+    const GEO_SUGGEST_LIMIT = 5;
+    const GEO_DEBOUNCE_MS = 400;
     // ==========================
 
     const statusEl  = document.getElementById("status");
@@ -400,9 +491,13 @@
     const searchInput = document.getElementById("searchInput");
     const btnClearSearch = document.getElementById("btnClearSearch");
     const btnGeocode = document.getElementById("btnGeocode");
+    const suggestionsEl = document.getElementById("suggestions");
 
     let ALL_ROWS = [];
     let CURRENT_ROWS = [];
+    let geoSuggestTimer = null;
+    let lastSuggestQuery = "";
+    let geoMarker = null;
 
     const setStatus = (m) => { statusEl.textContent = m; };
     const showLoading = () => { loadingEl.style.display = "flex"; };
@@ -468,7 +563,6 @@
       try { localStorage.setItem("bb_photo_ext_v1", JSON.stringify(obj)); } catch {}
     }
 
-    // ===== Selection storage (ONLY IDs) =====
     const FAV_KEY = "bb_selected_ids_v2";
     function getSelectedIds(){
       try {
@@ -564,7 +658,6 @@
       row.lon     = row.lon ?? "";
       row.price   = row.price ?? "";
       row.format  = row.format ?? "";
-
       row.notes = row.notes
         || row.note
         || row.notes_text
@@ -579,7 +672,6 @@
         || row["Hinweise"]
         || row["hinweise"]
         || "";
-
       row.leistungswert = row.leistungswert || row.Leistungswert || row["Leistungswert"] || "";
       return row;
     }
@@ -728,14 +820,12 @@
       if (pBody) pBody.scrollTop = 0;
     }
 
-    // close panel when clicking outside it (inside map)
     mapEl.addEventListener("click", (e) => {
       if (panelEl.style.display === "none") return;
       const inside = panelEl.contains(e.target);
       if (!inside) { lockMapUnderPanel(false); closePanel(); }
     }, true);
 
-    // Cache
     function getCachedRows() {
       if (CACHE_MINUTES === 0) return null;
       try {
@@ -769,7 +859,7 @@
       } catch { return false; }
     }
 
-    // ---------- Suche über Tabellen-Daten ----------
+    // ---------- Suche in Tabellen-Daten ----------
 
     function rowMatchesQuery(row, query) {
       if (!query) return true;
@@ -800,17 +890,28 @@
       if (window.__bb_renderRows) window.__bb_renderRows(filtered);
     }
 
-    // ---------- Geocoding: Adresse -> Karte ----------
+    function updateClearIcon() {
+      if (!btnClearSearch || !searchInput) return;
+      btnClearSearch.style.display = searchInput.value ? "block" : "none";
+    }
 
-    async function geocodeAddress(query) {
+    function clearSearch() {
+      if (!searchInput) return;
+      searchInput.value = "";
+      hideSuggestions();
+      updateClearIcon();
+      applySearchFilter();
+    }
+
+    // ---------- Geocoding & Vorschläge ----------
+
+    async function geocodeAddressOnce(query) {
       if (!query) return null;
       const url = "https://nominatim.openstreetmap.org/search?format=json&limit=1&q=" +
                   encodeURIComponent(query);
       try {
         const res = await fetch(url, {
-          headers: {
-            "Accept": "application/json"
-          }
+          headers: { "Accept": "application/json" }
         });
         if (!res.ok) throw new Error("Geocoding-Fehler: HTTP " + res.status);
         const data = await res.json();
@@ -825,6 +926,124 @@
         console.error(e);
         return null;
       }
+    }
+
+    async function fetchSuggestions(query) {
+      if (!query) return [];
+      const url = "https://nominatim.openstreetmap.org/search?format=json&limit=" +
+                  GEO_SUGGEST_LIMIT + "&q=" + encodeURIComponent(query);
+      try {
+        const res = await fetch(url, {
+          headers: { "Accept": "application/json" }
+        });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        if (!Array.isArray(data)) return [];
+        return data.map(item => ({
+          lat: parseFloat(item.lat),
+          lon: parseFloat(item.lon),
+          displayName: item.display_name || ""
+        }));
+      } catch (e) {
+        console.error(e);
+        return [];
+      }
+    }
+
+    function showSuggestions(list) {
+      if (!suggestionsEl) return;
+      if (!list.length) {
+        hideSuggestions();
+        return;
+      }
+      suggestionsEl.innerHTML = "";
+      for (const s of list) {
+        const div = document.createElement("div");
+        div.className = "suggest-item";
+        div.innerHTML = `
+          <span class="suggest-icon"></span>
+          <span>${esc(s.displayName)}</span>
+        `;
+        div.addEventListener("click", () => {
+          if (searchInput) {
+            searchInput.value = s.displayName;
+            updateClearIcon();
+          }
+          hideSuggestions();
+          applySearchFilter();
+          focusAddressOnMap(s);
+        });
+        suggestionsEl.appendChild(div);
+      }
+      suggestionsEl.style.display = "block";
+    }
+
+    function hideSuggestions() {
+      if (!suggestionsEl) return;
+      suggestionsEl.style.display = "none";
+      suggestionsEl.innerHTML = "";
+    }
+
+    function debounceSuggest(query) {
+      if (!suggestionsEl) return;
+      lastSuggestQuery = query;
+      if (geoSuggestTimer) clearTimeout(geoSuggestTimer);
+      if (!query) {
+        hideSuggestions();
+        return;
+      }
+      geoSuggestTimer = setTimeout(async () => {
+        const current = lastSuggestQuery;
+        const list = await fetchSuggestions(current);
+        if (current !== lastSuggestQuery) return;
+        showSuggestions(list);
+      }, GEO_DEBOUNCE_MS);
+    }
+
+    async function handleSearchSubmit() {
+      if (!searchInput) return;
+      const q = searchInput.value.trim();
+      applySearchFilter(); // immer Tabellen-Suche
+
+      if (!q) {
+        if (geoMarker && window.__bb_map) {
+          window.__bb_map.removeLayer(geoMarker);
+          geoMarker = null;
+        }
+        hideSuggestions();
+        return;
+      }
+
+      toast("Adresse wird gesucht…", 2500);
+      const res = await geocodeAddressOnce(q);
+      if (!res || !Number.isFinite(res.lat) || !Number.isFinite(res.lon)) {
+        toast("Adresse konnte nicht gefunden werden.", 4000);
+        return;
+      }
+      focusAddressOnMap(res);
+      hideSuggestions();
+    }
+
+    function focusAddressOnMap(res) {
+      if (!window.__bb_map || !res) return;
+      const map = window.__bb_map;
+      const center = [res.lat, res.lon];
+
+      map.setView(center, 15);
+
+      if (geoMarker) {
+        map.removeLayer(geoMarker);
+        geoMarker = null;
+      }
+      geoMarker = L.circleMarker(center, {
+        radius: 6,
+        color: "#0b6bcb",
+        weight: 2,
+        fillColor: "#ffffff",
+        fillOpacity: 1
+      }).addTo(map);
+
+      toast("Adresse gefunden. Werbeanlagen in der Nähe sind nun sichtbar.", 5000);
     }
 
     // ---------- Init ----------
@@ -894,7 +1113,6 @@
         renderSelectionUI();
       };
 
-      // globaler Zugriff für Suche
       window.__bb_renderRows = renderRows;
 
       const cached = getCachedRows();
@@ -926,58 +1144,40 @@
 
     if (searchInput) {
       searchInput.addEventListener("input", () => {
+        updateClearIcon();
         applySearchFilter();
+        debounceSuggest(searchInput.value.trim());
       });
       searchInput.addEventListener("keydown", (ev) => {
-        if (ev.key === "Enter") applySearchFilter();
+        if (ev.key === "Enter") {
+          ev.preventDefault();
+          handleSearchSubmit();
+        } else if (ev.key === "Escape") {
+          hideSuggestions();
+        }
+      });
+      searchInput.addEventListener("focus", () => {
+        if (searchInput.value.trim()) debounceSuggest(searchInput.value.trim());
       });
     }
 
     if (btnClearSearch && searchInput) {
       btnClearSearch.addEventListener("click", () => {
-        searchInput.value = "";
-        applySearchFilter();
+        clearSearch();
       });
     }
 
-    if (btnGeocode && searchInput) {
-      btnGeocode.addEventListener("click", async () => {
-        const q = searchInput.value.trim();
-        if (!q) {
-          toast("Bitte zuerst eine Adresse eingeben.", 3000);
-          return;
-        }
-        toast("Adresse wird gesucht…", 3000);
-        const res = await geocodeAddress(q);
-        if (!res || !Number.isFinite(res.lat) || !Number.isFinite(res.lon)) {
-          toast("Adresse konnte nicht gefunden werden.", 4000);
-          return;
-        }
-
-        if (!window.__bb_map) {
-          toast("Karte noch nicht bereit.", 3000);
-          return;
-        }
-
-        const map = window.__bb_map;
-        const center = [res.lat, res.lon];
-
-        map.setView(center, 15);
-
-        if (window.__geoCircle) {
-          map.removeLayer(window.__geoCircle);
-          window.__geoCircle = null;
-        }
-        window.__geoCircle = L.circle(center, {
-          radius: 500,
-          color: "#0b6bcb",
-          fillColor: "#0b6bcb",
-          fillOpacity: 0.08
-        }).addTo(map);
-
-        toast("Adresse gefunden. Werbeanlagen in der Nähe sind nun sichtbar.", 5000);
+    if (btnGeocode) {
+      btnGeocode.addEventListener("click", () => {
+        handleSearchSubmit(); // Lupe verhält sich wie Enter
       });
     }
+
+    document.addEventListener("click", (ev) => {
+      if (!suggestionsEl || suggestionsEl.style.display === "none") return;
+      if (ev.target === suggestionsEl || suggestionsEl.contains(ev.target) || ev.target === searchInput) return;
+      hideSuggestions();
+    });
 
     renderSelectionUI();
     init().catch(err => {
