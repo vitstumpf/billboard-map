@@ -441,7 +441,7 @@
             <input
               type="text"
               id="searchInput"
-              placeholder="Suche nach Werbefläche oder Adresse …"
+              placeholder="Ort oder Adresse eingeben …"
             />
             <div id="suggestions"></div>
           </div>
@@ -504,7 +504,6 @@
     const suggestionsEl = document.getElementById("suggestions");
 
     let ALL_ROWS = [];
-    let CURRENT_ROWS = [];
     let geoSuggestTimer = null;
     let lastSuggestQuery = "";
     let geoMarker = null;
@@ -871,36 +870,7 @@
       } catch { return false; }
     }
 
-    // ---------- Suche in Tabellen-Daten ----------
-
-    function rowMatchesQuery(row, query) {
-      if (!query) return true;
-      query = query.toLowerCase();
-      const n = normalizeRow(row);
-
-      const haystack =
-        (n.id + " " +
-         n.title + " " +
-         n.address + " " +
-         n.format + " " +
-         n.price + " " +
-         n.leistungswert + " " +
-         n.notes).toLowerCase();
-
-      return haystack.includes(query);
-    }
-
-    function applySearchFilter() {
-      const q = searchInput ? searchInput.value.trim() : "";
-      if (!q) {
-        CURRENT_ROWS = ALL_ROWS.slice();
-        if (window.__bb_renderRows) window.__bb_renderRows(CURRENT_ROWS);
-        return;
-      }
-      const filtered = ALL_ROWS.filter(r => rowMatchesQuery(r, q));
-      CURRENT_ROWS = filtered;
-      if (window.__bb_renderRows) window.__bb_renderRows(filtered);
-    }
+    /* --- Suche / Clear-Button --- */
 
     function updateClearButton() {
       if (!btnClearSearch || !searchInput) return;
@@ -916,14 +886,13 @@
       searchInput.value = "";
       hideSuggestions();
       updateClearButton();
-      applySearchFilter();
       if (geoMarker && map) {
         map.removeLayer(geoMarker);
         geoMarker = null;
       }
     }
 
-    // ---------- Geocoding & Vorschläge ----------
+    /* --- Geocoding & Vorschläge --- */
 
     async function geocodeAddressOnce(query) {
       if (!query) return null;
@@ -990,7 +959,6 @@
           }
           hideSuggestions();
           updateClearButton();
-          applySearchFilter();
           focusAddressOnMap(s);
         });
         suggestionsEl.appendChild(div);
@@ -1022,7 +990,6 @@
     async function handleSearchSubmit() {
       if (!searchInput) return;
       const q = searchInput.value.trim();
-      applySearchFilter();
 
       if (!q) {
         if (geoMarker && map) {
@@ -1055,8 +1022,10 @@
       }
       geoMarker = L.marker(center, { icon: redIcon }).addTo(map);
 
-      toast("Adresse gefunden. Werbeanlagen in der Nähe sind nun sichtbar.", 5000);
+      toast("Adresse gefunden. Werbeflächen in der Umgebung sind sichtbar.", 5000);
     }
+
+    /* --- Init --- */
 
     async function init() {
       setStatus("Karte wird geladen…");
@@ -1082,7 +1051,6 @@
         attribution: '&copy; OpenStreetMap'
       }).addTo(map);
 
-      // Standard-Icon und rotes Icon (gleiches Layout, andere Farbe)
       defaultIcon = L.icon({
         iconUrl: "https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png",
         iconSize: [25, 41],
@@ -1112,7 +1080,6 @@
       restoreMapPos(map);
 
       const renderRows = (rows) => {
-        CURRENT_ROWS = rows || [];
         clusters.clearLayers();
         let added = 0;
 
@@ -1141,39 +1108,35 @@
         renderSelectionUI();
       };
 
-      window.__bb_renderRows = renderRows;
-
       const cached = getCachedRows();
       if (cached) {
         ALL_ROWS = cached;
         renderRows(cached);
-        return;
+      } else {
+        Papa.parse(CSV_URL, {
+          download: true,
+          header: true,
+          skipEmptyLines: true,
+          complete: (r) => {
+            const rows = r.data || [];
+            ALL_ROWS = rows;
+            setCachedRows(rows);
+            renderRows(rows);
+          },
+          error: () => {
+            hideLoading();
+            setStatus("Fehler: Daten konnten nicht geladen werden.");
+            hintEl.style.display = "block";
+          }
+        });
       }
-
-      Papa.parse(CSV_URL, {
-        download: true,
-        header: true,
-        skipEmptyLines: true,
-        complete: (r) => {
-          const rows = r.data || [];
-          ALL_ROWS = rows;
-          setCachedRows(rows);
-          renderRows(rows);
-        },
-        error: () => {
-          hideLoading();
-          setStatus("Fehler: Daten konnten nicht geladen werden.");
-          hintEl.style.display = "block";
-        }
-      });
     }
 
-    // ---------- Events ----------
+    /* --- Events --- */
 
     if (searchInput) {
       searchInput.addEventListener("input", () => {
         updateClearButton();
-        applySearchFilter();
         debounceSuggest(searchInput.value.trim());
       });
       searchInput.addEventListener("keydown", (ev) => {
