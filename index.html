@@ -297,43 +297,46 @@
       }
     }
 
-    /* Search UI */
-    .search-wrapper{
-      position: relative;
+    /* Search UI: [X] [Input] [Lupe] */
+    .search-container{
       display:flex;
       align-items:center;
     }
-    #searchInput{
-      padding:8px 28px 8px 10px;
-      border:1px solid #ccc;
+    .search-clear-btn{
       border-radius:20px 0 0 20px;
+      border:1px solid #ccc;
+      border-right:none;
+      background:#fff;
+      width:34px;
+      height:34px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      cursor:pointer;
+      font-size:14px;
+      color:#666;
+    }
+    .search-clear-btn:hover{
+      background:#f5f5f5;
+      color:#000;
+    }
+    .search-clear-btn.disabled{
+      opacity:.4;
+      cursor:default;
+    }
+
+    #searchInput{
+      padding:8px 10px;
+      border-top:1px solid #ccc;
+      border-bottom:1px solid #ccc;
+      border-left:none;
+      border-right:none;
       min-width:260px;
       font-size:13px;
       outline:none;
     }
     #searchInput::placeholder{
       color:#999;
-    }
-    .search-clear{
-      position:absolute;
-      right:8px;
-      top:50%;
-      transform:translateY(-50%);
-      width:16px;
-      height:16px;
-      border-radius:50%;
-      border:none;
-      background:transparent;
-      font-size:14px;
-      line-height:16px;
-      text-align:center;
-      padding:0;
-      cursor:pointer;
-      color:#666;
-      display:none;
-    }
-    .search-clear:hover{
-      color:#000;
     }
 
     .search-button{
@@ -355,7 +358,7 @@
       border-color:#084c8d;
     }
 
-    /* Suggestions dropdown */
+    /* Suggestions dropdown (unter dem Input) */
     #suggestions{
       position:absolute;
       top:100%;
@@ -365,10 +368,15 @@
       overflow:auto;
       background:#fff;
       border:1px solid #ddd;
+      border-top:none;
       border-radius:0 0 16px 16px;
       box-shadow:0 8px 26px rgba(0,0,0,.16);
       z-index:1000;
       display:none;
+    }
+    .suggest-wrapper{
+      position:relative;
+      display:inline-block;
     }
     .suggest-item{
       display:flex;
@@ -394,15 +402,18 @@
     }
 
     @media (max-width:640px){
-      .search-wrapper{
+      .search-container{
         width:100%;
       }
       #searchInput{
         flex:1;
         min-width:0;
       }
+      .suggest-wrapper{
+        width:100%;
+      }
       #suggestions{
-        max-width:100%;
+        width:100%;
       }
     }
   </style>
@@ -425,17 +436,19 @@
 
       <!-- Suche + Geocoding -->
       <div class="left">
-        <div class="search-wrapper">
-          <input
-            type="text"
-            id="searchInput"
-            placeholder="Suche nach Werbefläche oder Adresse …"
-          />
-          <button type="button" class="search-clear" id="btnClearSearch" aria-label="Suche löschen">×</button>
+        <div class="search-container">
+          <button type="button" class="search-clear-btn disabled" id="btnClearSearch" aria-label="Suche löschen">×</button>
+          <div class="suggest-wrapper">
+            <input
+              type="text"
+              id="searchInput"
+              placeholder="Suche nach Werbefläche oder Adresse …"
+            />
+            <div id="suggestions"></div>
+          </div>
           <button class="search-button" id="btnGeocode" type="button" aria-label="Adresse suchen">
             🔍
           </button>
-          <div id="suggestions"></div>
         </div>
       </div>
     </div>
@@ -460,7 +473,6 @@
 
   <script>
   (function () {
-    // ========= CONFIG =========
     const CSV_URL  = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTn6jeSv4yw4yKG1SGOklT7LAU2EdWTUj_30jeJK_ZPWfS5wDfcpX96VbFfHms4aQ/pub?output=csv";
     const FORM_URL = "https://webforms.pipedrive.com/f/1rqc7SFMmd0tMGqY1NFzq1ZRpMihVWgWVsaSEYjMKRtYf2zpk9zjTHRUnYp7nYPvR";
 
@@ -474,7 +486,6 @@
     const DEFAULT_ZOOM = 6;
     const GEO_SUGGEST_LIMIT = 5;
     const GEO_DEBOUNCE_MS = 400;
-    // ==========================
 
     const statusEl  = document.getElementById("status");
     const loadingEl = document.getElementById("loading");
@@ -890,17 +901,25 @@
       if (window.__bb_renderRows) window.__bb_renderRows(filtered);
     }
 
-    function updateClearIcon() {
+    function updateClearButton() {
       if (!btnClearSearch || !searchInput) return;
-      btnClearSearch.style.display = searchInput.value ? "block" : "none";
+      if (searchInput.value) {
+        btnClearSearch.classList.remove("disabled");
+      } else {
+        btnClearSearch.classList.add("disabled");
+      }
     }
 
     function clearSearch() {
       if (!searchInput) return;
       searchInput.value = "";
       hideSuggestions();
-      updateClearIcon();
+      updateClearButton();
       applySearchFilter();
+      if (geoMarker && window.__bb_map) {
+        window.__bb_map.removeLayer(geoMarker);
+        geoMarker = null;
+      }
     }
 
     // ---------- Geocoding & Vorschläge ----------
@@ -967,9 +986,9 @@
         div.addEventListener("click", () => {
           if (searchInput) {
             searchInput.value = s.displayName;
-            updateClearIcon();
           }
           hideSuggestions();
+          updateClearButton();
           applySearchFilter();
           focusAddressOnMap(s);
         });
@@ -985,7 +1004,6 @@
     }
 
     function debounceSuggest(query) {
-      if (!suggestionsEl) return;
       lastSuggestQuery = query;
       if (geoSuggestTimer) clearTimeout(geoSuggestTimer);
       if (!query) {
@@ -1003,7 +1021,7 @@
     async function handleSearchSubmit() {
       if (!searchInput) return;
       const q = searchInput.value.trim();
-      applySearchFilter(); // immer Tabellen-Suche
+      applySearchFilter();
 
       if (!q) {
         if (geoMarker && window.__bb_map) {
@@ -1045,8 +1063,6 @@
 
       toast("Adresse gefunden. Werbeanlagen in der Nähe sind nun sichtbar.", 5000);
     }
-
-    // ---------- Init ----------
 
     async function init() {
       setStatus("Karte wird geladen…");
@@ -1140,11 +1156,11 @@
       });
     }
 
-    // ---------- Events für Suche & Geocoding ----------
+    // ---------- Events ----------
 
     if (searchInput) {
       searchInput.addEventListener("input", () => {
-        updateClearIcon();
+        updateClearButton();
         applySearchFilter();
         debounceSuggest(searchInput.value.trim());
       });
@@ -1161,15 +1177,16 @@
       });
     }
 
-    if (btnClearSearch && searchInput) {
+    if (btnClearSearch) {
       btnClearSearch.addEventListener("click", () => {
+        if (btnClearSearch.classList.contains("disabled")) return;
         clearSearch();
       });
     }
 
     if (btnGeocode) {
       btnGeocode.addEventListener("click", () => {
-        handleSearchSubmit(); // Lupe verhält sich wie Enter
+        handleSearchSubmit();
       });
     }
 
